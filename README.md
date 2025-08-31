@@ -1,0 +1,1 @@
+# DiscordRichPresencePlugin_MM
