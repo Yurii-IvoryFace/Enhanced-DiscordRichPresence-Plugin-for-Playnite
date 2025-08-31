@@ -1,0 +1,65 @@
+{
+  "playnite_logo": "playnite_logo",
+  "games": [
+    {
+      "name": "The Last of Us Part I",
+      "image": "tlou"
+    },
+    {
+      "name": "Cyberpunk 2077",
+      "image": "cyberpunk"
+    },
+    {
+      "name": "The Witcher 3",
+      "image": "witcher3"
+    },
+    {
+      "name": "Red Dead Redemption 2",
+      "image": "rdr2"
+    },
+    {
+      "name": "Grand Theft Auto V",
+      "image": "gtav"
+    },
+    {
+      "name": "Horizon Zero Dawn",
+      "image": "horizon"
+    },
+    {
+      "name": "God of War",
+      "image": "godofwar"
+    },
+    {
+      "name": "Spider-Man",
+      "image": "spiderman"
+    },
+    {
+      "name": "Death Stranding",
+      "image": "deathstranding"
+    },
+    {
+      "name": "Resident Evil",
+      "image": "residentevil"
+    },
+    {
+      "name": "Assassin's Creed",
+      "image": "assassinscreed"
+    },
+    {
+      "name": "Call of Duty",
+      "image": "callofduty"
+    },
+    {
+      "name": "Battlefield",
+      "image": "battlefield"
+    },
+    {
+      "name": "FIFA",
+      "image": "fifa"
+    },
+    {
+      "name": "Forza",
+      "image": "forza"
+    }
+  ]
+}
