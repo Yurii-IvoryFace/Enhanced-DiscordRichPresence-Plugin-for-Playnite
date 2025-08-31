@@ -15,6 +15,7 @@ namespace DiscordRichPresencePlugin
         private readonly ILogger logger;
         private readonly DiscordRpcService discordService;
         private readonly GameMappingService mappingService;
+        private readonly LibraryScannerService scannerService;
         private readonly DiscordRichPresenceSettings settings;
 
         public override Guid Id { get; } = Guid.Parse("7ad84e05-6c01-4b13-9b12-86af81775396");
@@ -26,8 +27,9 @@ namespace DiscordRichPresencePlugin
 
             Properties = new GenericPluginProperties { HasSettings = true };
 
-            mappingService = new GameMappingService(GetPluginUserDataPath());
+            mappingService = new GameMappingService(GetPluginUserDataPath(), logger);
             discordService = new DiscordRpcService(Constants.DISCORD_APP_ID, logger, settings, mappingService);
+            scannerService = new LibraryScannerService(PlayniteApi, logger, mappingService);
 
             InitializePlugin();
         }
@@ -45,6 +47,15 @@ namespace DiscordRichPresencePlugin
                 discordService.Initialize();
             }
         }
+
+        // Public method to access scanner service for UI
+        public LibraryScannerService GetLibraryScannerService() => scannerService;
+
+        // Public method to access mapping service for UI
+        public GameMappingService GetGameMappingService() => mappingService;
+
+        // Public method to access logger for UI
+        public ILogger GetLogger() => logger;
 
         public override void OnGameStarted(OnGameStartedEventArgs args)
         {
