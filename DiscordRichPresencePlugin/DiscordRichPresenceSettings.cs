@@ -34,8 +34,8 @@ namespace DiscordRichPresencePlugin
         public int UpdateInterval
         {
             get => updateInterval;
-            set => SetValue(ref updateInterval, 
-                          value < Constants.MIN_UPDATE_INTERVAL ? Constants.MIN_UPDATE_INTERVAL : 
+            set => SetValue(ref updateInterval,
+                          value < Constants.MIN_UPDATE_INTERVAL ? Constants.MIN_UPDATE_INTERVAL :
                           value > Constants.MAX_UPDATE_INTERVAL ? Constants.MAX_UPDATE_INTERVAL : value);
         }
         public bool ShowElapsedTime { get => showElapsedTime; set => SetValue(ref showElapsedTime, value); }
@@ -126,7 +126,7 @@ namespace DiscordRichPresencePlugin
                     plugin.Id.ToString(),
                     "config.json"
                 );
-                
+
                 var directory = Path.GetDirectoryName(path);
                 if (!Directory.Exists(directory))
                 {
