@@ -64,6 +64,8 @@ namespace DiscordRichPresencePlugin.Services
 
                 logger.Debug($"Game start time: {gameStartTime}, Unix timestamp: {startTimestamp}");
 
+                var buttons = CreateButtons();
+
                 var presence = new DiscordPresence
                 {
                     Details = FormatGameDetails(),
@@ -73,9 +75,12 @@ namespace DiscordRichPresencePlugin.Services
                     LargeImageText = currentGame.Name,
                     SmallImageKey = "playnite_logo",
                     SmallImageText = "via Playnite",
-                    Buttons = settings.ShowButtons ? CreateButtons() : null
+                    Buttons = buttons
                 };
-
+                // uncomment Debugger for debugging image keys in GameMappingService as well
+                //logger.Debug($"Large image key being sent to Discord: '{presence.LargeImageKey}'");
+                //logger.Debug($"Small image key being sent to Discord: '{presence.SmallImageKey}'");
+                //mappingService.DebugMappings(currentGame.Name);
                 logger.Debug($"Created presence - Details: '{presence.Details}', State: '{presence.State}', StartTimestamp: {presence.StartTimestamp}");
                 discordRPC.UpdatePresence(presence);
             }
@@ -139,40 +144,61 @@ namespace DiscordRichPresencePlugin.Services
         private string GetGameImageKey()
         {
             if (currentGame == null)
+            {
+                logger.Debug("Current game is null, using fallback image");
                 return settings.FallbackImageKey ?? Constants.DEFAULT_FALLBACK_IMAGE;
+            }
 
-            var imageKey = mappingService.GetImageKeyForGame(currentGame.Name) ??
-                          settings.FallbackImageKey ??
-                          Constants.DEFAULT_FALLBACK_IMAGE;
+            logger.Debug($"Getting image key for game: '{currentGame.Name}'");
 
-            logger.Debug($"Using image key: {imageKey} for game: {currentGame.Name}");
-            return imageKey;
+            var mappedImageKey = mappingService.GetImageKeyForGame(currentGame.Name);
+            logger.Debug($"Mapping service returned: '{mappedImageKey}' for game: '{currentGame.Name}'");
+
+            var finalImageKey = mappedImageKey ??
+                               settings.FallbackImageKey ??
+                               Constants.DEFAULT_FALLBACK_IMAGE;
+
+            logger.Debug($"Final image key: '{finalImageKey}' for game: '{currentGame.Name}'");
+
+            if (finalImageKey == Constants.DEFAULT_FALLBACK_IMAGE)
+            {
+                logger.Debug($"Using default Playnite logo for '{currentGame.Name}'");
+            }
+            else
+            {
+                logger.Debug($"Using custom/mapped image '{finalImageKey}' for '{currentGame.Name}'");
+            }
+
+            return finalImageKey;
         }
 
         private DiscordButton[] CreateButtons()
         {
+            if (!settings.ShowButtons)
+                return null;
+
             if (currentGame?.Links?.Any() == true)
             {
                 var firstLink = currentGame.Links.First();
                 return new[]
                 {
-                    new DiscordButton
-                    {
-                        Label = "Game Info",
-                        Url = firstLink.Url
-                    }
-                };
+            new DiscordButton
+            {
+                Label = "Game Info",
+                Url = firstLink.Url
+            }
+        };
             }
 
             // Fallback button
             return new[]
             {
-                new DiscordButton
-                {
-                    Label = "View Game",
-                    Url = $"playnite://playnite/game/{currentGame.Id}"
-                }
-            };
+        new DiscordButton
+        {
+            Label = "View Game",
+            Url = $"playnite://playnite/game/{currentGame.Id}"
+        }
+    };
         }
 
         private void StartUpdateTimer()
