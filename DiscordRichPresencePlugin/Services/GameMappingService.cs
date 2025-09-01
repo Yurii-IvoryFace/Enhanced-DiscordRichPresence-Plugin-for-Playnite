@@ -1,4 +1,4 @@
-using DiscordRichPresencePlugin.Models;
+﻿using DiscordRichPresencePlugin.Models;
 using Playnite.SDK;
 using Playnite.SDK.Data;
 using System;
@@ -66,6 +66,13 @@ namespace DiscordRichPresencePlugin.Services
                         }
 
                         logger?.Debug($"Loaded {mappings.Games.Count} game mappings from file");
+
+                        // Додаткова валідація
+                        if (string.IsNullOrEmpty(mappings.PlayniteLogo))
+                        {
+                            mappings.PlayniteLogo = Constants.DEFAULT_FALLBACK_IMAGE;
+                            logger?.Debug("Fixed empty PlayniteLogo");
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -395,13 +402,49 @@ namespace DiscordRichPresencePlugin.Services
                 return stats;
             }
         }
-    }
+        //    public void DebugMappings(string testGameName)
+        //    {
+        //        logger?.Debug($"=== DEBUGGING MAPPINGS ===");
+        //        logger?.Debug($"Mappings file path: {mappingsFilePath}");
+        //        logger?.Debug($"File exists: {File.Exists(mappingsFilePath)}");
 
-    public class MappingStatistics
-    {
-        public int TotalMappings { get; set; }
-        public int CustomImageMappings { get; set; }
-        public int DefaultImageMappings { get; set; }
-        public DateTime LastUpdated { get; set; } = DateTime.Now;
+        //        if (mappings == null)
+        //        {
+        //            logger?.Debug("Mappings object is NULL");
+        //            return;
+        //        }
+
+        //        logger?.Debug($"PlayniteLogo: '{mappings.PlayniteLogo}'");
+        //        logger?.Debug($"Games count: {mappings.Games?.Count ?? 0}");
+
+        //        if (mappings.Games != null)
+        //        {
+        //            logger?.Debug("All game mappings:");
+        //            foreach (var game in mappings.Games)
+        //            {
+        //                logger?.Debug($"  '{game.Name}' -> '{game.Image}'");
+
+        //                // Перевірка точного співпадіння з тестовою грою
+        //                if (string.Equals(game.Name, testGameName, StringComparison.OrdinalIgnoreCase))
+        //                {
+        //                    logger?.Debug($"  *** MATCH FOUND for '{testGameName}' ***");
+        //                }
+        //            }
+        //        }
+
+        //        // Тест пошуку
+        //        var result = GetImageKeyForGame(testGameName);
+        //        logger?.Debug($"GetImageKeyForGame('{testGameName}') returned: '{result}'");
+        //        logger?.Debug($"=== END DEBUG ===");
+        //    }
+        //}
+
+        public class MappingStatistics
+        {
+            public int TotalMappings { get; set; }
+            public int CustomImageMappings { get; set; }
+            public int DefaultImageMappings { get; set; }
+            public DateTime LastUpdated { get; set; } = DateTime.Now;
+        }
     }
 }

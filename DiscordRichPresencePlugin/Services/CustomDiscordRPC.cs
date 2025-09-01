@@ -125,6 +125,7 @@ namespace DiscordRichPresencePlugin.Services
                 {
                     logger.Debug($"Setting presence: {presence?.Details} | {presence?.State}");
 
+                    // Створюємо об'єкт activity з умовним включенням buttons
                     var activity = new
                     {
                         details = presence?.Details,
@@ -136,14 +137,29 @@ namespace DiscordRichPresencePlugin.Services
                             large_text = presence?.LargeImageText,
                             small_image = presence?.SmallImageKey,
                             small_text = presence?.SmallImageText
-                        },
-                        buttons = presence?.Buttons?.Select(b => new { label = b.Label, url = b.Url }).ToArray()
+                        }
                     };
 
+                    // Створюємо payload базовий
                     var payload = new
                     {
                         cmd = "SET_ACTIVITY",
-                        args = new { pid = System.Diagnostics.Process.GetCurrentProcess().Id, activity },
+                        args = new
+                        {
+                            pid = System.Diagnostics.Process.GetCurrentProcess().Id,
+                            activity = presence?.Buttons?.Any() == true ?
+                                // Якщо є кнопки, додаємо їх до activity
+                                new
+                                {
+                                    activity.details,
+                                    activity.state,
+                                    activity.timestamps,
+                                    activity.assets,
+                                    buttons = presence.Buttons.Select(b => new { label = b.Label, url = b.Url }).ToArray()
+                                } :
+                                // Якщо немає кнопок, не включаємо поле buttons взагалі
+                                (object)activity
+                        },
                         nonce = (++nonce).ToString()
                     };
 
