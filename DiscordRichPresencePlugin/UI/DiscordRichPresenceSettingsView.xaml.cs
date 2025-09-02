@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Navigation;
 using Playnite.SDK;
 
+
 namespace DiscordRichPresencePlugin
 {
     /// <summary>

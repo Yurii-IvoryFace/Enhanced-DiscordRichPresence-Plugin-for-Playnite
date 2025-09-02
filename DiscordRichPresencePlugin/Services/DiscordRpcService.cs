@@ -1,9 +1,11 @@
-﻿using DiscordRichPresencePlugin.Models;
-using Playnite.SDK;
-using Playnite.SDK.Models;
-using System;
+﻿using System;
 using System.Linq;
 using System.Timers;
+using Playnite.SDK;
+using Playnite.SDK.Models;
+using DiscordRichPresencePlugin.Enums;
+using DiscordRichPresencePlugin.Models;
+using DiscordRichPresencePlugin.Services;
 
 namespace DiscordRichPresencePlugin.Services
 {
@@ -13,25 +15,38 @@ namespace DiscordRichPresencePlugin.Services
         private readonly ILogger logger;
         private readonly DiscordRichPresenceSettings settings;
         private readonly GameMappingService mappingService;
+        private readonly TemplateService templateService;
+        private readonly ExtendedGameInfoService extendedInfoService;
+        private readonly ButtonService buttonService;
+
         private Timer presenceUpdateTimer;
         private Game currentGame;
         private DateTime gameStartTime;
+        private ExtendedGameInfo currentExtendedInfo;
 
-        public DiscordRpcService(string appId, ILogger logger, DiscordRichPresenceSettings settings, GameMappingService mappingService)
+        public DiscordRpcService(
+            string appId,
+            ILogger logger,
+            DiscordRichPresenceSettings settings,
+            GameMappingService mappingService,
+            TemplateService templateService,
+            ExtendedGameInfoService extendedInfoService,
+            ButtonService buttonService)
         {
             this.logger = logger;
             this.settings = settings;
             this.mappingService = mappingService;
+            this.templateService = templateService;
+            this.extendedInfoService = extendedInfoService;
+            this.buttonService = buttonService;
+
             discordRPC = new CustomDiscordRPC(appId, logger);
         }
 
         public void Initialize()
         {
-            if (settings.EnableRichPresence)
-            {
-                logger.Debug("Initializing Discord RPC service");
-                discordRPC.Initialize();
-            }
+            logger.Debug("Initializing DiscordRpcService");
+            discordRPC.Initialize();
         }
 
         public void UpdateGamePresence(Game game)
@@ -46,8 +61,26 @@ namespace DiscordRichPresencePlugin.Services
             currentGame = game;
             gameStartTime = DateTime.UtcNow;
 
+            // hydrate/refresh extended info and mark session start
+            currentExtendedInfo = extendedInfoService?.GetOrCreateGameInfo(game);
+            extendedInfoService?.StartSession(game.Id);
+
             UpdatePresence();
             StartUpdateTimer();
+        }
+
+        private void StartUpdateTimer()
+        {
+            presenceUpdateTimer?.Stop();
+            presenceUpdateTimer?.Dispose();
+
+            var interval = Math.Max(Constants.MIN_UPDATE_INTERVAL, Math.Min(Constants.MAX_UPDATE_INTERVAL, settings.UpdateInterval));
+            presenceUpdateTimer = new Timer(interval * 1000);
+            presenceUpdateTimer.Elapsed += (_, __) => UpdatePresence();
+            presenceUpdateTimer.AutoReset = true;
+            presenceUpdateTimer.Start();
+
+            logger.Debug($"Presence update timer started with interval: {interval}s");
         }
 
         private void UpdatePresence()
@@ -59,12 +92,13 @@ namespace DiscordRichPresencePlugin.Services
 
             try
             {
-                var startTimestamp = settings.ShowElapsedTime ?
-                    ((DateTimeOffset)gameStartTime).ToUnixTimeSeconds() : 0;
+                var startTimestamp = settings.ShowElapsedTime
+                    ? ((DateTimeOffset)gameStartTime).ToUnixTimeSeconds()
+                    : 0;
 
                 logger.Debug($"Game start time: {gameStartTime}, Unix timestamp: {startTimestamp}");
 
-                var buttons = CreateButtons();
+                var buttons = BuildButtons();
 
                 var presence = new DiscordPresence
                 {
@@ -77,16 +111,12 @@ namespace DiscordRichPresencePlugin.Services
                     SmallImageText = "via Playnite",
                     Buttons = buttons
                 };
-                // uncomment Debugger for debugging image keys in GameMappingService as well
-                //logger.Debug($"Large image key being sent to Discord: '{presence.LargeImageKey}'");
-                //logger.Debug($"Small image key being sent to Discord: '{presence.SmallImageKey}'");
-                //mappingService.DebugMappings(currentGame.Name);
-                logger.Debug($"Created presence - Details: '{presence.Details}', State: '{presence.State}', StartTimestamp: {presence.StartTimestamp}");
+
                 discordRPC.UpdatePresence(presence);
             }
             catch (Exception ex)
             {
-                logger.Error($"Failed to update Discord presence: {ex.Message}");
+                logger.Error($"Failed to update Discord presence: {ex}");
             }
         }
 
@@ -95,8 +125,19 @@ namespace DiscordRichPresencePlugin.Services
             if (currentGame == null)
                 return string.Empty;
 
-            var template = !string.IsNullOrEmpty(settings.CustomStatus) ?
-                settings.CustomStatus : Constants.DEFAULT_STATUS_FORMAT;
+            // Template-based Details
+            if (settings.UseTemplates && templateService != null)
+            {
+                var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
+                var formatted = templateService.FormatTemplateString(t?.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
+                if (!string.IsNullOrWhiteSpace(formatted))
+                    return formatted;
+            }
+
+            // Fallback to simple custom format
+            var template = string.IsNullOrEmpty(settings.CustomStatus)
+                ? Constants.DEFAULT_STATUS_FORMAT
+                : settings.CustomStatus;
 
             return template.Replace("{game}", currentGame.Name);
         }
@@ -106,130 +147,116 @@ namespace DiscordRichPresencePlugin.Services
             if (currentGame == null)
                 return string.Empty;
 
-            var stateComponents = new System.Collections.Generic.List<string>();
+            // Template-based State
+            if (settings.UseTemplates && templateService != null)
+            {
+                var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
+                var formatted = templateService.FormatTemplateString(t?.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
+                if (!string.IsNullOrWhiteSpace(formatted))
+                    return formatted;
+            }
 
-            // Fix: Use Platforms collection instead of Platform property
+            // Legacy/manual construction with optional extras
+            var parts = new System.Collections.Generic.List<string>();
+
+            // Platforms
             if (settings.ShowPlatform && currentGame.Platforms?.Any() == true)
             {
-                stateComponents.Add(string.Join(", ", currentGame.Platforms.Select(p => p.Name)));
+                parts.Add(string.Join(", ", currentGame.Platforms.Select(p => p.Name)));
             }
 
+            // Source
             if (settings.ShowSource && currentGame.Source != null)
             {
-                stateComponents.Add(currentGame.Source.Name);
+                parts.Add(currentGame.Source.Name);
             }
 
+            // Genres
             if (settings.ShowGenre && currentGame.Genres?.Any() == true)
             {
-                stateComponents.Add(string.Join(", ", currentGame.Genres.Select(g => g.Name)));
+                parts.Add(string.Join(", ", currentGame.Genres.Select(g => g.Name)));
             }
 
+            // Total playtime
             if (settings.ShowPlaytime && currentGame.Playtime > 0)
             {
-                var hours = currentGame.Playtime / 60;
-                var minutes = currentGame.Playtime % 60;
+                var totalSeconds = (long)currentGame.Playtime;
+                var hours = totalSeconds / 3600;
+                var minutes = (totalSeconds % 3600) / 60;
                 if (hours > 0)
                 {
-                    stateComponents.Add($"{hours}h {minutes}m played");
+                    parts.Add($"{hours}h {minutes}m played");
                 }
                 else
                 {
-                    stateComponents.Add($"{minutes}m played");
+                    parts.Add($"{minutes}m played");
                 }
             }
 
-            return string.Join(" | ", stateComponents);
+            // Progress (from ExtendedGameInfo)
+            if (settings.ShowCompletionPercentage && currentExtendedInfo != null)
+            {
+                parts.Add($"{currentExtendedInfo.CompletionPercentage}% complete");
+            }
+
+            if (settings.ShowAchievements && currentExtendedInfo != null && currentExtendedInfo.TotalAchievements > 0)
+            {
+                parts.Add($"🏆 {currentExtendedInfo.AchievementsEarned}/{currentExtendedInfo.TotalAchievements}");
+            }
+
+            return string.Join(" | ", parts);
         }
 
         private string GetGameImageKey()
         {
-            if (currentGame == null)
+            // Prefer explicit mapping; fallback to default logo
+            var finalImageKey = mappingService?.GetImageKeyForGame(currentGame?.Name)
+                                ?? Constants.DEFAULT_FALLBACK_IMAGE;
+
+            if (string.IsNullOrWhiteSpace(finalImageKey))
             {
-                logger.Debug("Current game is null, using fallback image");
-                return settings.FallbackImageKey ?? Constants.DEFAULT_FALLBACK_IMAGE;
-            }
-
-            logger.Debug($"Getting image key for game: '{currentGame.Name}'");
-
-            var mappedImageKey = mappingService.GetImageKeyForGame(currentGame.Name);
-            logger.Debug($"Mapping service returned: '{mappedImageKey}' for game: '{currentGame.Name}'");
-
-            var finalImageKey = mappedImageKey ??
-                               settings.FallbackImageKey ??
-                               Constants.DEFAULT_FALLBACK_IMAGE;
-
-            logger.Debug($"Final image key: '{finalImageKey}' for game: '{currentGame.Name}'");
-
-            if (finalImageKey == Constants.DEFAULT_FALLBACK_IMAGE)
-            {
-                logger.Debug($"Using default Playnite logo for '{currentGame.Name}'");
-            }
-            else
-            {
-                logger.Debug($"Using custom/mapped image '{finalImageKey}' for '{currentGame.Name}'");
+                finalImageKey = Constants.DEFAULT_FALLBACK_IMAGE;
             }
 
             return finalImageKey;
         }
 
-        private DiscordButton[] CreateButtons()
+        private DiscordButton[] BuildButtons()
         {
-            if (!settings.ShowButtons)
+            if (!settings.ShowButtons || currentGame == null)
                 return null;
 
-            if (currentGame?.Links?.Any() == true)
+            if (settings.ButtonMode == ButtonDisplayMode.Off)
+                return null;
+
+            // Auto mode – let ButtonService decide best two buttons based on game/extended info
+            if (buttonService != null)
             {
-                var firstLink = currentGame.Links.First();
-                return new[]
-                {
-            new DiscordButton
-            {
-                Label = "Game Info",
-                Url = firstLink.Url
-            }
-        };
+                return buttonService.CreateButtons(currentGame, currentExtendedInfo);
             }
 
-            // Fallback button
+            // Minimal fallback if service is unavailable
+            if (currentGame.Links?.Any() == true)
+            {
+                var first = currentGame.Links.First();
+                return new[] { new DiscordButton { Label = "Game Info", Url = first.Url } };
+            }
+
             return new[]
             {
-        new DiscordButton
-        {
-            Label = "View Game",
-            Url = $"playnite://playnite/game/{currentGame.Id}"
-        }
-    };
-        }
-
-        private void StartUpdateTimer()
-        {
-            if (presenceUpdateTimer != null)
-            {
-                presenceUpdateTimer.Stop();
-                presenceUpdateTimer.Elapsed -= OnPresenceTimerElapsed;
-                presenceUpdateTimer.Dispose();
-            }
-
-            var interval = TimeSpan.FromSeconds(settings.UpdateInterval);
-            presenceUpdateTimer = new Timer(interval.TotalMilliseconds)
-            {
-                AutoReset = true
+                new DiscordButton
+                {
+                    Label = "View Game",
+                    Url = $"playnite://playnite/game/{currentGame.Id}"
+                }
             };
-            presenceUpdateTimer.Elapsed += OnPresenceTimerElapsed;
-            presenceUpdateTimer.Start();
-
-            logger.Debug($"Started presence update timer with {settings.UpdateInterval}s interval");
-        }
-
-        private void OnPresenceTimerElapsed(object sender, ElapsedEventArgs e)
-        {
-            UpdatePresence();
         }
 
         public void ClearPresence()
         {
             logger.Debug("Clearing Discord presence");
             currentGame = null;
+            currentExtendedInfo = null;
             presenceUpdateTimer?.Dispose();
             presenceUpdateTimer = null;
             discordRPC?.ClearPresence();

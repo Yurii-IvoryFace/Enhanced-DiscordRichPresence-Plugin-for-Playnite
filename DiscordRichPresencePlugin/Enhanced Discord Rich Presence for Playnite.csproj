@@ -65,7 +65,7 @@
     <Compile Include="Services\CustomDiscordRPC.cs" />
     <Compile Include="DiscordRichPresencePlugin.cs" />
     <Compile Include="DiscordRichPresenceSettings.cs" />
-    <Compile Include="DiscordRichPresenceSettingsView.xaml.cs">
+    <Compile Include="UI\DiscordRichPresenceSettingsView.xaml.cs">
       <DependentUpon>DiscordRichPresenceSettingsView.xaml</DependentUpon>
     </Compile>
     <Compile Include="Services\DiscordRpcService.cs" />
@@ -88,7 +88,13 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Page Include="DiscordRichPresenceSettingsView.xaml">
+    <Page Include="UI\DiscordRichPresenceSettingsView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UI\ExtendedSettingsView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UI\TemplateManagerView.xaml">
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>

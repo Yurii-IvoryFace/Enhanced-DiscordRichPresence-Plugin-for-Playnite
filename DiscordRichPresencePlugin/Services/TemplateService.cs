@@ -263,10 +263,11 @@ namespace DiscordRichPresencePlugin.Services
                 return false;
 
             // Check total playtime
-            if (conditions.MinPlaytimeMinutes.HasValue && (long)game.Playtime < conditions.MinPlaytimeMinutes.Value)
-                return false;
-            if (conditions.MaxPlaytimeMinutes.HasValue && (long)game.Playtime > conditions.MaxPlaytimeMinutes.Value)
-                return false;
+            var totalMinutes = (int)((game?.Playtime ?? 0) / 60);
+                        if (conditions.MinPlaytimeMinutes.HasValue && totalMinutes < conditions.MinPlaytimeMinutes.Value)
+                                return false;
+                        if (conditions.MaxPlaytimeMinutes.HasValue && totalMinutes > conditions.MaxPlaytimeMinutes.Value)
+                                return false;
 
             // Check completion
             if (conditions.CompletionPercentage != null && info != null)
@@ -339,7 +340,7 @@ namespace DiscordRichPresencePlugin.Services
             // Time-related
             var sessionTime = DateTime.UtcNow - sessionStart;
             result = result.Replace(TemplateVariables.SessionTime, FormatTimeSpan(sessionTime));
-            result = result.Replace(TemplateVariables.TotalPlaytime, FormatPlaytime((long)(game?.Playtime ?? 0)));
+            result = result.Replace(TemplateVariables.TotalPlaytime, FormatPlaytimeFromSeconds((long)(game?.Playtime ?? 0)));
             result = result.Replace(TemplateVariables.TimeOfDay, GetTimeOfDay());
             result = result.Replace(TemplateVariables.DayOfWeek, DateTime.Now.DayOfWeek.ToString());
 
@@ -395,11 +396,12 @@ namespace DiscordRichPresencePlugin.Services
             return $"{time.Minutes}m";
         }
 
-        private string FormatPlaytime(long minutes)
+        private string FormatPlaytimeFromSeconds(long seconds)
         {
-            if (minutes >= 60)
-                return $"{minutes / 60}h {minutes % 60}m";
-            return $"{minutes}m";
+            if (seconds <= 0) return "0m";
+           var hours = seconds / 3600;
+           var minutes = (seconds % 3600) / 60;
+            return hours > 0 ? $"{hours}h {minutes}m" : $"{minutes}m";
         }
 
         private string GetTimeOfDay()

@@ -1,0 +1,121 @@
+﻿<UserControl x:Class="DiscordRichPresencePlugin.DiscordRichPresenceSettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:enums="clr-namespace:DiscordRichPresencePlugin.Enums"
+             mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="16" Orientation="Vertical" VerticalAlignment="Top" >
+
+            <!-- Загальні -->
+            <GroupBox Header="Загальні" Margin="0,0,0,12">
+                <StackPanel Margin="10" Orientation="Vertical" >
+                    <CheckBox Content="Увімкнути Discord Rich Presence"
+                              IsChecked="{Binding EnableRichPresence}" />
+                    <CheckBox Content="Показувати платформу"
+                              IsChecked="{Binding ShowPlatform}" />
+                    <CheckBox Content="Показувати джерело (Source)"
+                              IsChecked="{Binding ShowSource}" />
+                    <CheckBox Content="Показувати жанри"
+                              IsChecked="{Binding ShowGenre}" />
+                    <CheckBox Content="Показувати загальний час гри"
+                              IsChecked="{Binding ShowPlaytime}" />
+                    <CheckBox Content="Показувати таймер сесії (Elapsed)"
+                              IsChecked="{Binding ShowElapsedTime}" />
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Інтервал оновлення (сек):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox Width="60" Text="{Binding UpdateInterval, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Fallback Large Image Key:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox Width="180" Text="{Binding FallbackImageKey}" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Кастомний шаблон (fallback):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox Width="380" Text="{Binding CustomStatus}" />
+                    </StackPanel>
+
+                    <Button Content="Відкрити теку зі схемами (mapping)"
+                            Margin="0,8,0,0"
+                            Click="ButtonOpenMappingsFolder_Click"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Шаблони -->
+            <GroupBox Header="Шаблони статусу" Margin="0,0,0,12">
+                <StackPanel Margin="10" Orientation="Vertical">
+                    <CheckBox Content="Використовувати шаблони"
+                              IsChecked="{Binding UseTemplates}" />
+                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
+                               Opacity="0.8">
+                        Для тонкого налаштування (увімк/вимк окремі шаблони, пріоритети) скористайся менеджером:
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <Button Content="Менеджер шаблонів…" ToolTip="TemplateManagerView"
+                                Padding="10,2"
+                                Tag="templateManager" />
+                        <TextBlock Text="  (за замовчуванням увімкнені 10 вбудованих)" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Прогрес -->
+            <GroupBox Header="Прогрес" Margin="0,0,0,12">
+                <StackPanel Margin="10" Orientation="Vertical">
+                    <CheckBox Content="Показувати % завершення"
+                              IsChecked="{Binding ShowCompletionPercentage}" />
+                    <CheckBox Content="Показувати досягнення"
+                              IsChecked="{Binding ShowAchievements}" />
+                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
+                               Opacity="0.8">
+                        Ці поля заповнюються з ExtendedGameInfoService. Якщо дані відсутні — секції не відображаються.
+                    </TextBlock>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Кнопки -->
+            <GroupBox Header="Кнопки Discord" Margin="0,0,0,12">
+                <StackPanel Margin="10" Orientation="Vertical">
+                    <CheckBox Content="Показувати кнопки"
+                              IsChecked="{Binding ShowButtons}" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock Text="Режим кнопок:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox Width="180"
+                                  SelectedValue="{Binding ButtonMode}"
+                                  SelectedValuePath="Tag">
+                            <ComboBoxItem Tag="{x:Static enums:ButtonDisplayMode.Off}">Вимкнено</ComboBoxItem>
+                            <ComboBoxItem Tag="{x:Static enums:ButtonDisplayMode.Auto}">Авто</ComboBoxItem>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.8">
+                        У режимі “Авто” ButtonService підбирає до 2 найдоречніших кнопок (посилання гри, сторінка магазину, досягнення тощо).
+                    </TextBlock>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Довідка -->
+            <GroupBox Header="Довідка" Margin="0,0,0,0">
+                <StackPanel Margin="10" Orientation="Vertical">
+                    <TextBlock TextWrapping="Wrap">
+                        Підказка: якщо Discord не оновлює статус, перезапусти Playnite та гру. Перевір, що ввімкнено EnableRichPresence.
+                    </TextBlock>
+                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap">
+                        Для власних картинок LargeImageKey скористайся відображенням імен у файлі mappings.json у теці плагіна.
+                    </TextBlock>
+                    <TextBlock Margin="8,8,0,0">
+                        <Hyperlink NavigateUri="https://discord.com/developers/applications" RequestNavigate="Hyperlink_RequestNavigate">
+                            Discord Developer Portal
+                        </Hyperlink>
+                    </TextBlock>
+                </StackPanel>
+            </GroupBox>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

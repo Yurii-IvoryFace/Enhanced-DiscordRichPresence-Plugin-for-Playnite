@@ -16,6 +16,9 @@ namespace DiscordRichPresencePlugin
         private readonly DiscordRpcService discordService;
         private readonly GameMappingService mappingService;
         private readonly DiscordRichPresenceSettings settings;
+        private readonly TemplateService templateService;
+        private readonly ExtendedGameInfoService extendedInfoService;
+        private readonly ButtonService buttonService;
 
         public override Guid Id { get; } = Guid.Parse("7ad84e05-6c01-4b13-9b12-86af81775396");
 
@@ -27,7 +30,17 @@ namespace DiscordRichPresencePlugin
             Properties = new GenericPluginProperties { HasSettings = true };
 
             mappingService = new GameMappingService(GetPluginUserDataPath(), logger);
-            discordService = new DiscordRpcService(Constants.DISCORD_APP_ID, logger, settings, mappingService);
+            templateService = new TemplateService(GetPluginUserDataPath(), logger);
+            extendedInfoService = new ExtendedGameInfoService(GetPluginUserDataPath(), logger);
+            buttonService = new ButtonService(logger, settings);
+            discordService = new DiscordRpcService(
+    Constants.DISCORD_APP_ID,
+    logger,
+    settings,
+    mappingService,
+    templateService,
+    extendedInfoService,
+    buttonService);
 
             InitializePlugin();
         }
@@ -46,8 +59,6 @@ namespace DiscordRichPresencePlugin
             }
         }
 
-        // Public method to access scanner service for UI
-
         // Public method to access mapping service for UI
         public GameMappingService GetGameMappingService() => mappingService;
 
@@ -59,6 +70,7 @@ namespace DiscordRichPresencePlugin
             if (args?.Game != null && settings.EnableRichPresence)
             {
                 discordService.UpdateGamePresence(args.Game);
+                extendedInfoService?.StartSession(args.Game.Id);
             }
         }
 
@@ -66,8 +78,9 @@ namespace DiscordRichPresencePlugin
         {
             if (settings.EnableRichPresence)
             {
-                discordService.ClearPresence();
+                extendedInfoService?.EndSession(args.Game.Id);
             }
+            discordService.ClearPresence();
         }
 
         private void OnGameItemUpdated(object sender, ItemUpdatedEventArgs<Game> e)
