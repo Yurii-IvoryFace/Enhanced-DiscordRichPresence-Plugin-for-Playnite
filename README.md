@@ -1,1 +1,3 @@
-# DiscordRichPresencePlugin_MM
+# DiscordRichPresencePlugin
+
+**IN PROGRESS**

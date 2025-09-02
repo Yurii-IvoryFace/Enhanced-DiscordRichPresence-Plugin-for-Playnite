@@ -26,7 +26,7 @@ namespace DiscordRichPresencePlugin
 
             Properties = new GenericPluginProperties { HasSettings = true };
 
-            mappingService = new GameMappingService(GetPluginUserDataPath());
+            mappingService = new GameMappingService(GetPluginUserDataPath(), logger);
             discordService = new DiscordRpcService(Constants.DISCORD_APP_ID, logger, settings, mappingService);
 
             InitializePlugin();
@@ -45,6 +45,14 @@ namespace DiscordRichPresencePlugin
                 discordService.Initialize();
             }
         }
+
+        // Public method to access scanner service for UI
+
+        // Public method to access mapping service for UI
+        public GameMappingService GetGameMappingService() => mappingService;
+
+        // Public method to access logger for UI
+        public ILogger GetLogger() => logger;
 
         public override void OnGameStarted(OnGameStartedEventArgs args)
         {
