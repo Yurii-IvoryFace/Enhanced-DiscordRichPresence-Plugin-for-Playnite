@@ -275,7 +275,10 @@ namespace DiscordRichPresencePlugin.Services
             presenceUpdateTimer = null;
             discordRPC?.ClearPresence();
         }
-
+        public void Reconnect()
+        {
+            discordRPC?.Reconnect();
+        }
         public void Dispose()
         {
             logger.Debug("Disposing Discord RPC service");

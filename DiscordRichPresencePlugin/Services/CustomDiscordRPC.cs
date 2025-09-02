@@ -40,7 +40,7 @@ namespace DiscordRichPresencePlugin.Services
                 }
             });
         }
-
+            
         private async Task ConnectAsync()
         {
             logger.Debug("Attempting to connect to Discord...");
@@ -82,7 +82,12 @@ namespace DiscordRichPresencePlugin.Services
             logger.Error("Failed to connect to Discord - make sure Discord is running and the application is registered");
             throw new Exception("Could not connect to Discord IPC");
         }
-
+        public void Reconnect()
+        {
+            logger.Debug("Forcing Discord RPC reconnect");
+            try { Dispose(); } catch { /* ignore */ }
+            Initialize();
+        }
         private async Task HandshakeAsync()
         {
             var handshake = new
