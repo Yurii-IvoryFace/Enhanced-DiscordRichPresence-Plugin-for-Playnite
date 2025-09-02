@@ -74,6 +74,10 @@
     <Compile Include="Enums\OpCode.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\TemplateService.cs" />
+    <Compile Include="UI\TemplateManagerView.xaml.cs">
+      <DependentUpon>TemplateManagerView.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UI\TemplateManagerViewModel.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="extension.yaml">

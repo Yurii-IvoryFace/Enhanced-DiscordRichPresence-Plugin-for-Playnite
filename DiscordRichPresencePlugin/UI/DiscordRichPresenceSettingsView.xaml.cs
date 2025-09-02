@@ -5,7 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Navigation;
 using Playnite.SDK;
-
+using System.Windows.Media;
+using DiscordRichPresencePlugin.Services;
+using DiscordRichPresencePlugin.Views;
 
 namespace DiscordRichPresencePlugin
 {
@@ -21,6 +23,7 @@ namespace DiscordRichPresencePlugin
         {
             InitializeComponent();
             playniteApi = API.Instance;
+            this.Loaded += OnLoadedAttachTemplateManager;
         }
 
         private string GetPluginFolderPath()
@@ -77,6 +80,81 @@ namespace DiscordRichPresencePlugin
                     "Помилка"
                 );
             }
+        }
+
+        private void OnLoadedAttachTemplateManager(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // шукаємо кнопку за Tag="templateManager", щоб не міняти XAML
+                var btn = FindChild<Button>(this, b => (b.Tag as string) == "templateManager");
+                if (btn != null)
+                {
+                    btn.Click -= TemplateManagerButton_Click;
+                    btn.Click += TemplateManagerButton_Click;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Failed to wire Template Manager button: {ex.Message}");
+            }
+        }
+
+        private void TemplateManagerButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var pluginFolder = GetPluginFolderPath();
+                var templateService = new TemplateService(pluginFolder, logger);
+
+                var view = new TemplateManagerView();
+                var vm = new TemplateManagerViewModel(templateService);
+                view.DataContext = vm;
+
+                // У options залишаємо тільки те, що підтримується
+                var window = playniteApi.Dialogs.CreateWindow(new WindowCreationOptions
+                {
+                    ShowCloseButton = true,
+                    ShowMaximizeButton = true,
+                    ShowMinimizeButton = true
+                });
+
+                // Налаштовуємо властивості ВЖЕ створеного вікна
+                window.Title = "Менеджер шаблонів";
+                window.Width = 900;
+                window.Height = 600;
+                window.ResizeMode = ResizeMode.CanResize;
+                window.SizeToContent = SizeToContent.Manual;
+                window.Owner = Window.GetWindow(this);
+                window.Content = view;
+
+                window.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Failed to open Template Manager: {ex.Message}");
+                playniteApi?.Dialogs?.ShowErrorMessage(
+                    "Не вдалося відкрити менеджер шаблонів. Перевірте журнали.",
+                    "Помилка");
+            }
+        }
+
+        // універсальний пошук дочірнього елемента за предикатом
+        private T FindChild<T>(DependencyObject parent, Func<T, bool> predicate) where T : DependencyObject
+        {
+            if (parent == null) return null;
+
+            var count = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T typed && (predicate?.Invoke(typed) ?? true))
+                    return typed;
+
+                var nested = FindChild<T>(child, predicate);
+                if (nested != null) return nested;
+            }
+            return null;
         }
     }
 }

@@ -229,27 +229,41 @@ namespace DiscordRichPresencePlugin.Services
             if (settings.ButtonMode == ButtonDisplayMode.Off)
                 return null;
 
-            // Auto mode – let ButtonService decide best two buttons based on game/extended info
+            DiscordButton[] raw = null;
+
             if (buttonService != null)
             {
-                return buttonService.CreateButtons(currentGame, currentExtendedInfo);
+                raw = buttonService.CreateButtons(currentGame, currentExtendedInfo);
+            }
+            else
+            {
+                raw = currentGame?.Links?
+                    .Where(l => IsSupportedUrl(l?.Url))
+                    .Take(2)
+                    .Select(l => new DiscordButton { Label = string.IsNullOrWhiteSpace(l.Name) ? "Open link" : l.Name, Url = l.Url })
+                    .ToArray();
             }
 
-            // Minimal fallback if service is unavailable
-            if (currentGame.Links?.Any() == true)
+            var filtered = raw?
+                .Where(b => IsSupportedUrl(b?.Url) && !string.IsNullOrWhiteSpace(b?.Label))
+                .Take(2)
+                .ToArray();
+
+            if (filtered?.Any() == true)
             {
-                var first = currentGame.Links.First();
-                return new[] { new DiscordButton { Label = "Game Info", Url = first.Url } };
+                logger.Debug($"Buttons prepared: {string.Join(", ", filtered.Select(b => $"{b.Label} => {b.Url}"))}");
+                return filtered;
             }
 
-            return new[]
-            {
-                new DiscordButton
-                {
-                    Label = "View Game",
-                    Url = $"playnite://playnite/game/{currentGame.Id}"
-                }
-            };
+            logger.Debug("No valid https buttons available; sending presence without buttons.");
+            return null;
+        }
+        private static bool IsSupportedUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return false;
+            // Discord зазвичай приймає тільки HTTPS для кнопок
+            return string.Equals(u.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
         }
 
         public void ClearPresence()
