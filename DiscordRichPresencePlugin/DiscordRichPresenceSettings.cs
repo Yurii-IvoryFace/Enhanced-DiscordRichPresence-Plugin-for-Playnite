@@ -28,9 +28,20 @@ namespace DiscordRichPresencePlugin
         private bool showCompletionPercentage = true;
         private bool showAchievements = true;
         private Enums.ButtonDisplayMode buttonMode = Enums.ButtonDisplayMode.Auto;
+        private string discordAppId = Constants.DISCORD_APP_ID;
+        private string activeAppId;
 
 
-
+        public string DiscordAppId
+        {
+            get => discordAppId;
+            set => SetValue(ref discordAppId, value);
+        }
+        public string ActiveAppId
+        {
+            get => activeAppId;
+            set => SetValue(ref activeAppId, value);
+        }
         public bool EnableRichPresence { get => enableRichPresence; set => SetValue(ref enableRichPresence, value); }
         public bool ShowGenre { get => showGenre; set => SetValue(ref showGenre, value); }
         public bool ShowButtons { get => showButtons; set => SetValue(ref showButtons, value); }
@@ -74,11 +85,24 @@ namespace DiscordRichPresencePlugin
 
         public void EndEdit()
         {
-            SaveSettings();
+            var oldId = editingClone?.DiscordAppId?.Trim() ?? string.Empty;
+            var newId = DiscordAppId?.Trim() ?? string.Empty;
+
+            SaveSettings(); // збережеться в config.json, бо тепер властивість є
+
+            if (!string.Equals(oldId, newId, StringComparison.Ordinal))
+            {
+                try { plugin?.ApplyNewDiscordAppId(newId); } catch { }
+            }
         }
         #endregion
 
         #region Private Methods
+
+        public void RequestReconnect()
+        {
+            try { plugin?.ApplyNewDiscordAppId(DiscordAppId?.Trim()); } catch { }
+        }
         private void LoadSavedSettings()
         {
             if (plugin == null) return;
@@ -107,6 +131,9 @@ namespace DiscordRichPresencePlugin
             ShowCompletionPercentage = source.ShowCompletionPercentage;
             ShowAchievements = source.ShowAchievements;
             ButtonMode = source.ButtonMode;
+            DiscordAppId = string.IsNullOrWhiteSpace(source.DiscordAppId)
+        ? Constants.DISCORD_APP_ID
+        : source.DiscordAppId;
         }
 
         private DiscordRichPresenceSettings LoadSettings()
