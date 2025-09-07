@@ -8,22 +8,21 @@ using System.Security.Cryptography;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using DiscordRichPresencePlugin.Models;
-
-// alias, щоб уникнути колізій із System.Windows.Shapes.Path
 using IOPath = System.IO.Path;
 
 namespace DiscordRichPresencePlugin.Services
 {
     /// <summary>
-    /// Готує локальні зображення для Discord Rich Presence assets (≤512x512, <256KB):
-    /// - бере cover/background/icon з Playnite
-    /// - ресайз/компресія PNG/JPEG
-    /// - іменування згідно mapping.Image (assetKey)
-    /// - кеш через manifest (хеш джерела)
+    /// Підготовка локальних зображень для Discord assets:
+    /// - масштаб до діапазону [512..1024] по обох осях,
+    /// - якщо після масштабування одна зі сторін < 512 → додаємо прозору підкладку,
+    /// - PNG як перша спроба, потім JPEG зі зниженням якості до <256KB,
+    /// - кеш за хешем джерела.
     /// </summary>
     public class ImageManagerService
     {
-        private const int MaxSizePx = 512;
+        private const int MinSizePx = 512;
+        private const int MaxSizePx = 1024;
         private const long MaxBytes = 256 * 1024; // 256KB
 
         private readonly IPlayniteAPI api;
@@ -55,10 +54,6 @@ namespace DiscordRichPresencePlugin.Services
             LoadManifest();
         }
 
-        /// <summary>
-        /// Готує локальний asset-файл для гри (за потреби).
-        /// Повертає (повний шлях до файла, assetKey).
-        /// </summary>
         public (string localPath, string assetKey) PrepareGameImage(Game game)
         {
             if (game == null || string.IsNullOrWhiteSpace(game.Name))
@@ -102,10 +97,10 @@ namespace DiscordRichPresencePlugin.Services
                 var tmpJpg = destJpg + ".tmp";
 
                 var src = LoadBitmap(sourcePath);
-                var scaled = ResizeKeepingAspect(src, MaxSizePx, MaxSizePx);
+                var prepared = ResizeAndPadToRange(src, MinSizePx, MaxSizePx); // ⬅️ нова логіка
 
                 // 1) PNG спроба
-                SavePng(scaled, tmpPng);
+                SavePng(prepared, tmpPng);
                 var fileToUse = tmpPng;
 
                 var fi = new FileInfo(tmpPng);
@@ -116,7 +111,7 @@ namespace DiscordRichPresencePlugin.Services
                     bool ok = false;
                     foreach (var q in qualities)
                     {
-                        SaveJpeg(scaled, tmpJpg, q);
+                        SaveJpeg(prepared, tmpJpg, q);
                         var fj = new FileInfo(tmpJpg);
                         if (fj.Length <= MaxBytes)
                         {
@@ -127,7 +122,7 @@ namespace DiscordRichPresencePlugin.Services
                     }
                     if (!ok)
                     {
-                        fileToUse = tmpJpg; // візьмемо останню (найменшу) спробу
+                        fileToUse = tmpJpg; // остання спроба буде найменшою
                     }
 
                     TryDelete(tmpPng);
@@ -159,9 +154,6 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-        /// <summary>
-        /// Перевіряє, що локальний asset відповідає обмеженням Discord.
-        /// </summary>
         public bool ValidateLocalAsset(string path, out string reason)
         {
             reason = null;
@@ -187,9 +179,14 @@ namespace DiscordRichPresencePlugin.Services
                     return false;
                 }
 
+                if (w < MinSizePx || h < MinSizePx)
+                {
+                    reason = $"< {MinSizePx}px ({w}x{h})";
+                    return false;
+                }
                 if (w > MaxSizePx || h > MaxSizePx)
                 {
-                    reason = $">512px ({w}x{h})";
+                    reason = $"> {MaxSizePx}px ({w}x{h})";
                     return false;
                 }
 
@@ -202,9 +199,6 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-        /// <summary>
-        /// Відкрити теку з підготовленими файлами (для ручного аплоаду у Dev Portal).
-        /// </summary>
         public void OpenAssetsFolder()
         {
             try
@@ -221,7 +215,7 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-        // ========= Internals =========
+        // ===== Internals =====
 
         private string ResolveBestSourceImage(Game game)
         {
@@ -262,7 +256,7 @@ namespace DiscordRichPresencePlugin.Services
             {
                 var bi = new BitmapImage();
                 bi.BeginInit();
-                bi.CacheOption = BitmapCacheOption.OnLoad; // щоб не тримати файл відкритим
+                bi.CacheOption = BitmapCacheOption.OnLoad; // не тримаємо файл відкритим
                 bi.StreamSource = fs;
                 bi.EndInit();
                 bi.Freeze();
@@ -270,15 +264,60 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-        private static BitmapSource ResizeKeepingAspect(BitmapSource src, int maxW, int maxH)
+        /// <summary>
+        /// Масштабує зображення так, щоб виконувались обмеження:
+        /// - max(dim) ≤ MaxPx,
+        /// - min(dim) ≥ MinPx (якщо не виконується після масштабування — додає прозору підкладку).
+        /// </summary>
+        private static BitmapSource ResizeAndPadToRange(BitmapSource src, int minPx, int maxPx)
         {
-            double scale = Math.Min((double)maxW / src.PixelWidth, (double)maxH / src.PixelHeight);
-            if (scale > 1.0) scale = 1.0;
+            int sw = src.PixelWidth;
+            int sh = src.PixelHeight;
 
-            var transform = new ScaleTransform(scale, scale);
-            var tb = new TransformedBitmap(src, transform);
-            tb.Freeze();
-            return tb;
+            if (sw <= 0 || sh <= 0)
+                return src;
+
+            // Обчислюємо допустимий масштаб s:
+            // 512 ≤ min(sw*s, sh*s),  max(sw*s, sh*s) ≤ 1024
+            // sLower = 512 / min(sw,sh), sUpper = 1024 / max(sw,sh)
+            double sLower = (double)minPx / Math.Min(sw, sh);
+            double sUpper = (double)maxPx / Math.Max(sw, sh);
+
+            double s = (sLower <= sUpper) ? sLower : sUpper; // якщо неможливо виконати обидва — не перевищуємо max
+            if (double.IsNaN(s) || double.IsInfinity(s) || s <= 0) s = 1.0;
+
+            // Масштабуємо
+            var scaled = new TransformedBitmap(src, new ScaleTransform(s, s));
+            scaled.Freeze();
+
+            int tw = (int)Math.Round(sw * s);
+            int th = (int)Math.Round(sh * s);
+
+            // Якщо якась зі сторін все ще < minPx — додаємо прозору підкладку до minPx
+            int canvasW = Math.Max(tw, minPx);
+            int canvasH = Math.Max(th, minPx);
+
+            // Якщо обидві сторони вже в діапазоні — підкладка не потрібна
+            if (canvasW == tw && canvasH == th)
+            {
+                return scaled;
+            }
+
+            // Малюємо scaled по центру прозорого полотна
+            var dv = new System.Windows.Media.DrawingVisual();
+            using (var dc = dv.RenderOpen())
+            {
+                // Прозорий фон (нічого не малюємо — за замовчуванням прозорий)
+                // Центруємо
+                double ox = (canvasW - tw) / 2.0;
+                double oy = (canvasH - th) / 2.0;
+                dc.DrawImage(scaled, new System.Windows.Rect(ox, oy, tw, th));
+            }
+
+            var rtb = new RenderTargetBitmap(canvasW, canvasH, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(dv);
+            rtb.Freeze();
+            return rtb;
         }
 
         private static void SavePng(BitmapSource bitmap, string path)
