@@ -11,7 +11,7 @@ namespace DiscordRichPresencePlugin.Services
 {
     public class DiscordRpcService : IDisposable
     {
-        private readonly CustomDiscordRPC discordRPC;
+        private CustomDiscordRPC discordRPC; // <- no readonly
         private readonly ILogger logger;
         private readonly DiscordRichPresenceSettings settings;
         private readonly GameMappingService mappingService;
@@ -23,6 +23,8 @@ namespace DiscordRichPresencePlugin.Services
         private Game currentGame;
         private DateTime gameStartTime;
         private ExtendedGameInfo currentExtendedInfo;
+
+        private string appId; // <- track current app id
 
         public DiscordRpcService(
             string appId,
@@ -40,15 +42,52 @@ namespace DiscordRichPresencePlugin.Services
             this.extendedInfoService = extendedInfoService;
             this.buttonService = buttonService;
 
-            discordRPC = new CustomDiscordRPC(appId, logger);
+            this.appId = appId;
+            discordRPC = new CustomDiscordRPC(this.appId, logger);
         }
 
         public void Initialize()
         {
-            logger.Debug("Initializing DiscordRpcService");
-            discordRPC.Initialize();
+            if (settings.EnableRichPresence)
+            {
+                logger.Debug("Initializing Discord RPC service");
+                discordRPC.Initialize();
+            }
         }
 
+        /// <summary>
+        /// Повна переініціалізація з новим App ID (викликати після зміни налаштувань).
+        /// </summary>
+        public void Reinitialize(string newAppId)
+        {
+            var target = string.IsNullOrWhiteSpace(newAppId) ? Constants.DISCORD_APP_ID : newAppId.Trim();
+            if (string.Equals(appId, target, StringComparison.Ordinal))
+            {
+                logger.Debug("Reinitialize called with the same App ID, skipping.");
+                return;
+            }
+
+            logger.Info($"Reinitializing Discord RPC: {appId} -> {target}");
+
+            // зупинити таймер, прибрати старий RPC
+            try { presenceUpdateTimer?.Stop(); } catch { }
+            presenceUpdateTimer?.Dispose();
+            presenceUpdateTimer = null;
+
+            try { discordRPC?.Dispose(); } catch { }
+
+            // створити новий RPC і ініціалізувати
+            appId = target;
+            discordRPC = new CustomDiscordRPC(appId, logger);
+            discordRPC.Initialize();
+
+            // якщо гра активна — відновити presence і таймер
+            if (currentGame != null)
+            {
+                UpdatePresence();
+                StartUpdateTimer();
+            }
+        }
         public void UpdateGamePresence(Game game)
         {
             if (game == null)
@@ -95,7 +134,6 @@ namespace DiscordRichPresencePlugin.Services
                 var startTimestamp = settings.ShowElapsedTime
                     ? ((DateTimeOffset)gameStartTime).ToUnixTimeSeconds()
                     : 0;
-
 
                 var buttons = BuildButtons();
 
@@ -176,7 +214,7 @@ namespace DiscordRichPresencePlugin.Services
                 parts.Add(string.Join(", ", currentGame.Genres.Select(g => g.Name)));
             }
 
-            // Total playtime
+            // Total playtime (seconds -> H/M)
             if (settings.ShowPlaytime && currentGame.Playtime > 0)
             {
                 var totalSeconds = (long)currentGame.Playtime;
@@ -250,13 +288,14 @@ namespace DiscordRichPresencePlugin.Services
 
             if (filtered?.Any() == true)
             {
-                //logger.Debug($"Buttons prepared: {string.Join(", ", filtered.Select(b => $"{b.Label} => {b.Url}"))}");
+                // logger.Debug($"Buttons prepared: {string.Join(", ", filtered.Select(b => $"{b.Label} => {b.Url}"))}");
                 return filtered;
             }
 
             logger.Debug("No valid https buttons available; sending presence without buttons.");
             return null;
         }
+
         private static bool IsSupportedUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) return false;
@@ -274,6 +313,7 @@ namespace DiscordRichPresencePlugin.Services
             presenceUpdateTimer = null;
             discordRPC?.ClearPresence();
         }
+
         public void Reconnect()
         {
             discordRPC?.Reconnect();

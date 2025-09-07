@@ -8,8 +8,10 @@ using Playnite.SDK;
 using System.Windows.Media;
 using DiscordRichPresencePlugin.Services;
 using DiscordRichPresencePlugin.Views;
-using DiscordRichPresencePlugin.Services;
-
+using System.Text.RegularExpressions;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 namespace DiscordRichPresencePlugin
 {
     /// <summary>
@@ -20,7 +22,8 @@ namespace DiscordRichPresencePlugin
         private readonly ILogger logger = LogManager.GetLogger();
         private readonly IPlayniteAPI playniteApi;
         private readonly ImageManagerService imageManager;
-
+        private static readonly Regex AppIdStrict = new Regex(@"^[0-9]{17,19}$");
+        private static readonly Regex DigitsOnly = new Regex(@"^[0-9]+$");
 
         public DiscordRichPresenceSettingsView()
         {
@@ -32,6 +35,60 @@ namespace DiscordRichPresencePlugin
         {
             this.imageManager = imageManager;
         }
+
+
+        private void Reconnect_Click(object sender, RoutedEventArgs e)
+        {
+            var s = DataContext as DiscordRichPresenceSettings;
+            if (s == null) return;
+
+            var id = (s.DiscordAppId ?? string.Empty).Trim();
+            if (!AppIdStrict.IsMatch(id))
+            {
+                API.Instance?.Dialogs?.ShowErrorMessage(
+                    "Invalid App ID. It must be 17–19 digits.", "Discord Rich Presence");
+                return;
+            }
+
+            s.RequestReconnect(); // викликає plugin.ApplyNewDiscordAppId(...)
+        }
+        private void CopyActiveId_Click(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is DiscordRichPresenceSettings s && !string.IsNullOrWhiteSpace(s.ActiveAppId))
+            {
+                Clipboard.SetText(s.ActiveAppId);
+            }
+        }
+
+        private void AppIdBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            // дозволяємо вводити лише цифри
+            e.Handled = !DigitsOnly.IsMatch(e.Text);
+        }
+
+        private void AppIdBox_OnPaste(object sender, DataObjectPastingEventArgs e)
+        {
+            // блокуємо пастинг не-цифр і довжину > 19
+            if (!e.DataObject.GetDataPresent(DataFormats.UnicodeText))
+            {
+                e.CancelCommand();
+                return;
+            }
+
+            var paste = (string)e.DataObject.GetData(DataFormats.UnicodeText);
+            var box = (TextBox)sender;
+
+            var proposed = box.Text.Remove(box.SelectionStart, box.SelectionLength)
+                                   .Insert(box.SelectionStart, paste);
+
+            if (!Regex.IsMatch(proposed, @"^[0-9]{0,19}$"))
+            {
+                e.CancelCommand();
+            }
+        }
+
+
+
         private string GetPluginFolderPath()
         {
             return Path.Combine(

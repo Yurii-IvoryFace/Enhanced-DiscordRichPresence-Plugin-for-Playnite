@@ -7,10 +7,7 @@ using Playnite.SDK.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Windows.Controls;
-using System.Text.RegularExpressions;
-using DiscordRichPresencePlugin.Models;
 
 
 namespace DiscordRichPresencePlugin
@@ -25,7 +22,7 @@ namespace DiscordRichPresencePlugin
         private readonly ExtendedGameInfoService extendedInfoService;
         private readonly ButtonService buttonService;
         private readonly ImageManagerService imageManager;
-
+        private string currentAppId;
 
         public override Guid Id { get; } = Guid.Parse("7ad84e05-6c01-4b13-9b12-86af81775396");
 
@@ -33,9 +30,13 @@ namespace DiscordRichPresencePlugin
         {
             logger = LogManager.GetLogger();
             settings = new DiscordRichPresenceSettings(this);
-
             Properties = new GenericPluginProperties { HasSettings = true };
 
+
+            currentAppId = string.IsNullOrWhiteSpace(settings.DiscordAppId)
+    ? Constants.DISCORD_APP_ID
+    : settings.DiscordAppId.Trim();
+            settings.ActiveAppId = currentAppId;
             mappingService = new GameMappingService(GetPluginUserDataPath(), logger);
             templateService = new TemplateService(GetPluginUserDataPath(), logger);
             extendedInfoService = new ExtendedGameInfoService(GetPluginUserDataPath(), logger);
@@ -43,7 +44,7 @@ namespace DiscordRichPresencePlugin
             imageManager = new ImageManagerService(PlayniteApi, logger, mappingService, GetPluginUserDataPath());
 
             discordService = new DiscordRpcService(
-                Constants.DISCORD_APP_ID,
+                currentAppId,
                 logger,
                 settings,
                 mappingService,
@@ -67,7 +68,17 @@ namespace DiscordRichPresencePlugin
                 discordService.Initialize();
             }
         }
+        public void ApplyNewDiscordAppId(string newId)
+        {
+            var target = string.IsNullOrWhiteSpace(newId) ? Constants.DISCORD_APP_ID : newId.Trim();
+            if (string.Equals(currentAppId, target, StringComparison.Ordinal))
+                return;
 
+            logger.Info($"Discord App ID changed: {currentAppId} -> {target}");
+            currentAppId = target;
+            discordService?.Reinitialize(currentAppId);
+            settings.ActiveAppId = currentAppId;
+        }
         // Public method to access mapping service for UI
         public GameMappingService GetGameMappingService() => mappingService;
         public ILogger GetLogger() => logger;
@@ -295,6 +306,7 @@ namespace DiscordRichPresencePlugin
         }
 
         public override ISettings GetSettings(bool firstRunSettings) => settings;
+
 
         public override UserControl GetSettingsView(bool firstRunSettings) => new DiscordRichPresenceSettingsView(imageManager);
     }

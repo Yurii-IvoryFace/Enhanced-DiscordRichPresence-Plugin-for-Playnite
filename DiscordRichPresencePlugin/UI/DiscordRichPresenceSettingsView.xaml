@@ -10,22 +10,42 @@
         <StackPanel Margin="16" Orientation="Vertical" VerticalAlignment="Top" >
 
             <!-- Загальні -->
+            <StackPanel Margin="0,8,0,0">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Discord App ID:" VerticalAlignment="Center" Width="130"/>
+                    <TextBox x:Name="AppIdBox"
+             Width="280"
+             Text="{Binding DiscordAppId, UpdateSourceTrigger=PropertyChanged}"
+             PreviewTextInput="AppIdBox_PreviewTextInput"
+             DataObject.Pasting="AppIdBox_OnPaste"
+             ToolTip="Digits only (17–19). The numeric Client ID from Discord Developer Portal." />
+                    <Button Content="Reconnect" Margin="8,0,0,0" Click="Reconnect_Click"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="130,2,0,0">
+                    <TextBlock Text="{Binding ActiveAppId, StringFormat=Active App ID: {0}}" VerticalAlignment="Center" Foreground="Gray"/>
+                    <Button Content="Copy" Margin="8,0,0,0" Padding="6,0"
+          Click="CopyActiveId_Click"/>
+                </StackPanel>
+
+                <TextBlock Margin="130,4,0,0" Foreground="Gray"
+             Text="Tip: App ID must be 17–19 digits; click Reconnect to apply without saving."/>
+            </StackPanel>
             <GroupBox Header="Загальні" Margin="0,0,0,12">
                 <StackPanel Margin="10" Orientation="Vertical" >
-                    <CheckBox Content="Увімкнути Discord Rich Presence"
+                    <CheckBox Content="Enable Discord Rich Presence"
                               IsChecked="{Binding EnableRichPresence}" />
-                    <CheckBox Content="Показувати платформу"
+                    <CheckBox Content="Show Platform"
                               IsChecked="{Binding ShowPlatform}" />
-                    <CheckBox Content="Показувати джерело (Source)"
+                    <CheckBox Content="Show Source"
                               IsChecked="{Binding ShowSource}" />
-                    <CheckBox Content="Показувати жанри"
+                    <CheckBox Content="Show Genres"
                               IsChecked="{Binding ShowGenre}" />
-                    <CheckBox Content="Показувати загальний час гри"
+                    <CheckBox Content="Show Total Playtime"
                               IsChecked="{Binding ShowPlaytime}" />
-                    <CheckBox Content="Показувати таймер сесії (Elapsed)"
+                    <CheckBox Content="Show session timer (Elapsed)"
                               IsChecked="{Binding ShowElapsedTime}" />
                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="Інтервал оновлення (сек):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Update interval (seconds):" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBox Width="60" Text="{Binding UpdateInterval, UpdateSourceTrigger=PropertyChanged}" />
                     </StackPanel>
 
@@ -35,41 +55,41 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="Кастомний шаблон (fallback):" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Custom template (fallback):" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBox Width="380" Text="{Binding CustomStatus}" />
                     </StackPanel>
 
-                    <Button Content="Відкрити теку зі схемами (mapping)"
+                    <Button Content="Open folder with mappings (mapping)"
                             Margin="0,8,0,0"
                             Click="ButtonOpenMappingsFolder_Click"/>
-                    <Button Content="Відкрити теку ассетів" Click="ButtonOpenAssets_Click"/>
+                    <Button Content="Open assets folder" Margin="0,8,0,0" Click="ButtonOpenAssets_Click"/>
                 </StackPanel>
             </GroupBox>
 
             <!-- Шаблони -->
-            <GroupBox Header="Шаблони статусу" Margin="0,0,0,12">
+            <GroupBox Header="Status Templates" Margin="0,0,0,12">
                 <StackPanel Margin="10" Orientation="Vertical">
-                    <CheckBox Content="Використовувати шаблони"
+                    <CheckBox Content="Use Templates"
                               IsChecked="{Binding UseTemplates}" />
                     <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
                                Opacity="0.8">
-                        Для тонкого налаштування (увімк/вимк окремі шаблони, пріоритети) скористайся менеджером:
+                        For fine tuning (enabling/disabling individual templates, priorities), use the manager:
                     </TextBlock>
                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <Button Content="Менеджер шаблонів…" ToolTip="TemplateManagerView"
+                        <Button Content="Template Manager..." ToolTip="TemplateManagerView"
                                 Padding="10,2"
                                 Tag="templateManager" />
-                        <TextBlock Text="  (за замовчуванням увімкнені 10 вбудованих)" VerticalAlignment="Center" />
+                        <TextBlock Text="  (10 built-in templates enabled by default)" VerticalAlignment="Center" />
                     </StackPanel>
                 </StackPanel>
             </GroupBox>
 
             <!-- Прогрес -->
-            <GroupBox Header="Прогрес" Margin="0,0,0,12">
+            <GroupBox Header="Progress" Margin="0,0,0,12">
                 <StackPanel Margin="10" Orientation="Vertical">
-                    <CheckBox Content="Показувати % завершення"
+                    <CheckBox Content="Show % completion"
                               IsChecked="{Binding ShowCompletionPercentage}" />
-                    <CheckBox Content="Показувати досягнення"
+                    <CheckBox Content="Show achievements"
                               IsChecked="{Binding ShowAchievements}" />
                     <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
                                Opacity="0.8">
@@ -79,35 +99,35 @@
             </GroupBox>
 
             <!-- Кнопки -->
-            <GroupBox Header="Кнопки Discord" Margin="0,0,0,12">
+            <GroupBox Header="Discord buttons" Margin="0,0,0,12">
                 <StackPanel Margin="10" Orientation="Vertical">
-                    <CheckBox Content="Показувати кнопки"
+                    <CheckBox Content="Show buttons"
                               IsChecked="{Binding ShowButtons}" />
 
                     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="Режим кнопок:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="Button mode:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <ComboBox Width="180"
                                   SelectedValue="{Binding ButtonMode}"
                                   SelectedValuePath="Tag">
-                            <ComboBoxItem Tag="{x:Static enums:ButtonDisplayMode.Off}">Вимкнено</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static enums:ButtonDisplayMode.Auto}">Авто</ComboBoxItem>
+                            <ComboBoxItem Tag="{x:Static enums:ButtonDisplayMode.Off}">Off</ComboBoxItem>
+                            <ComboBoxItem Tag="{x:Static enums:ButtonDisplayMode.Auto}">Auto</ComboBoxItem>
                         </ComboBox>
                     </StackPanel>
 
                     <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.8">
-                        У режимі “Авто” ButtonService підбирає до 2 найдоречніших кнопок (посилання гри, сторінка магазину, досягнення тощо).
+                          In “Auto” mode, ButtonService selects up to 2 most relevant buttons (game links, store page, achievements, etc.).
                     </TextBlock>
                 </StackPanel>
             </GroupBox>
 
             <!-- Довідка -->
-            <GroupBox Header="Довідка" Margin="0,0,0,0">
+            <GroupBox Header="Help" Margin="0,0,0,0">
                 <StackPanel Margin="10" Orientation="Vertical">
                     <TextBlock TextWrapping="Wrap">
-                        Підказка: якщо Discord не оновлює статус, перезапусти Playnite та гру. Перевір, що ввімкнено EnableRichPresence.
+                         Tip: If Discord does not update your status, restart Playnite and the game. Check that EnableRichPresence is enabled.
                     </TextBlock>
                     <TextBlock Margin="0,6,0,0" TextWrapping="Wrap">
-                        Для власних картинок LargeImageKey скористайся відображенням імен у файлі mappings.json у теці плагіна.
+                        For custom LargeImageKey images, use the names listed in the mappings.json file in the plugin folder.
                     </TextBlock>
                     <TextBlock Margin="8,8,0,0">
                         <Hyperlink NavigateUri="https://discord.com/developers/applications" RequestNavigate="Hyperlink_RequestNavigate">
