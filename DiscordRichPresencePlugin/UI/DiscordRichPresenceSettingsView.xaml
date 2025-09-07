@@ -42,6 +42,7 @@
                     <Button Content="Відкрити теку зі схемами (mapping)"
                             Margin="0,8,0,0"
                             Click="ButtonOpenMappingsFolder_Click"/>
+                    <Button Content="Відкрити теку ассетів" Click="ButtonOpenAssets_Click"/>
                 </StackPanel>
             </GroupBox>
 

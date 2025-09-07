@@ -96,7 +96,6 @@ namespace DiscordRichPresencePlugin.Services
                     ? ((DateTimeOffset)gameStartTime).ToUnixTimeSeconds()
                     : 0;
 
-                logger.Debug($"Game start time: {gameStartTime}, Unix timestamp: {startTimestamp}");
 
                 var buttons = BuildButtons();
 
@@ -251,7 +250,7 @@ namespace DiscordRichPresencePlugin.Services
 
             if (filtered?.Any() == true)
             {
-                logger.Debug($"Buttons prepared: {string.Join(", ", filtered.Select(b => $"{b.Label} => {b.Url}"))}");
+                //logger.Debug($"Buttons prepared: {string.Join(", ", filtered.Select(b => $"{b.Label} => {b.Url}"))}");
                 return filtered;
             }
 

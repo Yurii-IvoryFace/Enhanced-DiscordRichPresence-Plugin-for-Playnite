@@ -128,7 +128,7 @@ namespace DiscordRichPresencePlugin.Services
             {
                 try
                 {
-                    logger.Debug($"Setting presence: {presence?.Details} | {presence?.State}");
+                    //logger.Debug($"Setting presence: {presence?.Details} | {presence?.State}");
 
                     // Створюємо об'єкт activity з умовним включенням buttons
                     var activity = new
@@ -174,14 +174,14 @@ namespace DiscordRichPresencePlugin.Services
                     var response = await ReadResponseAsync();
                     if (!string.IsNullOrEmpty(response))
                     {
-                        logger.Debug($"Discord response: {response}");
+                        //logger.Debug($"Discord response: {response}");
                     }
                     else
                     {
                         logger.Warn("No response received from Discord after setting presence");
                     }
 
-                    logger.Debug("Presence update sent successfully");
+                    //logger.Debug("Presence update sent successfully");
                 }
                 catch (Exception ex)
                 {
@@ -233,13 +233,13 @@ namespace DiscordRichPresencePlugin.Services
                 var opCode = BitConverter.ToInt32(header, 0);
                 var length = BitConverter.ToInt32(header, 4);
 
-                logger.Debug($"Reading response: OpCode={opCode}, Length={length}");
+                //logger.Debug($"Reading response: OpCode={opCode}, Length={length}");
 
                 var data = new byte[length];
                 await pipe.ReadAsync(data, 0, length);
 
                 var response = Encoding.UTF8.GetString(data);
-                logger.Debug($"Response received: {response}");
+                //logger.Debug($"Response received: {response}");
 
                 return response;
             }
@@ -261,7 +261,7 @@ namespace DiscordRichPresencePlugin.Services
             try
             {
                 var json = JsonConvert.SerializeObject(payload);
-                logger.Debug($"Sending payload: {json}");
+                //logger.Debug($"Sending payload: {json}");
 
                 var data = Encoding.UTF8.GetBytes(json);
 
@@ -273,7 +273,7 @@ namespace DiscordRichPresencePlugin.Services
                 await pipe.WriteAsync(data, 0, data.Length);
                 await pipe.FlushAsync();
 
-                logger.Debug("Data sent successfully");
+                //logger.Debug("Data sent successfully");
             }
             catch (Exception ex)
             {

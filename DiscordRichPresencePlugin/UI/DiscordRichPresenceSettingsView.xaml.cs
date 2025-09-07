@@ -8,6 +8,7 @@ using Playnite.SDK;
 using System.Windows.Media;
 using DiscordRichPresencePlugin.Services;
 using DiscordRichPresencePlugin.Views;
+using DiscordRichPresencePlugin.Services;
 
 namespace DiscordRichPresencePlugin
 {
@@ -18,6 +19,8 @@ namespace DiscordRichPresencePlugin
     {
         private readonly ILogger logger = LogManager.GetLogger();
         private readonly IPlayniteAPI playniteApi;
+        private readonly ImageManagerService imageManager;
+
 
         public DiscordRichPresenceSettingsView()
         {
@@ -25,7 +28,10 @@ namespace DiscordRichPresencePlugin
             playniteApi = API.Instance;
             this.Loaded += OnLoadedAttachTemplateManager;
         }
-
+        public DiscordRichPresenceSettingsView(ImageManagerService imageManager) : this()
+        {
+            this.imageManager = imageManager;
+        }
         private string GetPluginFolderPath()
         {
             return Path.Combine(
@@ -136,6 +142,28 @@ namespace DiscordRichPresencePlugin
                 playniteApi?.Dialogs?.ShowErrorMessage(
                     "Не вдалося відкрити менеджер шаблонів. Перевірте журнали.",
                     "Помилка");
+            }
+        }
+
+        private void ButtonOpenAssets_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (imageManager != null)
+                {
+                    imageManager.OpenAssetsFolder();
+                    return;
+                }
+
+                // fallback: відкрити теку напряму, якщо з якоїсь причини сервіс не передали
+                var path = System.IO.Path.Combine(GetPluginFolderPath(), "assets");
+                if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+                Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Failed to open assets folder: {ex.Message}");
+                playniteApi?.Dialogs?.ShowErrorMessage("Не вдалося відкрити теку assets. Перевірте журнали.", "Помилка");
             }
         }
 
