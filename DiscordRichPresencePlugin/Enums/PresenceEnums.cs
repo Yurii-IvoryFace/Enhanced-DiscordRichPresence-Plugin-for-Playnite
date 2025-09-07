@@ -52,6 +52,13 @@
         Community,
         Custom
     }
+    public enum ButtonDisplayMode
+    {
+        Off = 0,
+        Auto = 1,
+        // Custom = 2, // залишив на майбутнє, під користувацькі конфіги
+    }
+
 
     /// <summary>
     /// Display priority for status elements

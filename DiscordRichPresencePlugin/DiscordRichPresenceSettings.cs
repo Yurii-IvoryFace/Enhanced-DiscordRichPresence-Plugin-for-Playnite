@@ -23,6 +23,13 @@ namespace DiscordRichPresencePlugin
         private int updateInterval = Constants.MIN_UPDATE_INTERVAL;
         private bool showElapsedTime = true;
         private string fallbackImageKey = Constants.DEFAULT_FALLBACK_IMAGE;
+        private bool useTemplates = true;
+        private List<string> enabledTemplateIds = new List<string>();
+        private bool showCompletionPercentage = true;
+        private bool showAchievements = true;
+        private Enums.ButtonDisplayMode buttonMode = Enums.ButtonDisplayMode.Auto;
+
+
 
         public bool EnableRichPresence { get => enableRichPresence; set => SetValue(ref enableRichPresence, value); }
         public bool ShowGenre { get => showGenre; set => SetValue(ref showGenre, value); }
@@ -40,6 +47,14 @@ namespace DiscordRichPresencePlugin
         }
         public bool ShowElapsedTime { get => showElapsedTime; set => SetValue(ref showElapsedTime, value); }
         public string FallbackImageKey { get => fallbackImageKey; set => SetValue(ref fallbackImageKey, value); }
+
+        public bool UseTemplates { get => useTemplates; set => SetValue(ref useTemplates, value); }
+        public List<string> EnabledTemplateIds { get => enabledTemplateIds; set => SetValue(ref enabledTemplateIds, value); }
+        public bool ShowCompletionPercentage { get => showCompletionPercentage; set => SetValue(ref showCompletionPercentage, value); }
+        public bool ShowAchievements { get => showAchievements; set => SetValue(ref showAchievements, value); }
+        public Enums.ButtonDisplayMode ButtonMode { get => buttonMode; set => SetValue(ref buttonMode, value); }
+
+
         #endregion
 
         #region Constructors
@@ -87,6 +102,11 @@ namespace DiscordRichPresencePlugin
             UpdateInterval = source.UpdateInterval;
             ShowElapsedTime = source.ShowElapsedTime;
             FallbackImageKey = source.FallbackImageKey ?? Constants.DEFAULT_FALLBACK_IMAGE;
+            UseTemplates = source.UseTemplates;
+            EnabledTemplateIds = source.EnabledTemplateIds ?? new List<string>();
+            ShowCompletionPercentage = source.ShowCompletionPercentage;
+            ShowAchievements = source.ShowAchievements;
+            ButtonMode = source.ButtonMode;
         }
 
         private DiscordRichPresenceSettings LoadSettings()

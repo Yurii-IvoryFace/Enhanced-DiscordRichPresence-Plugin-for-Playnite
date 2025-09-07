@@ -40,6 +40,101 @@ namespace DiscordRichPresencePlugin.Services
         }
 
         /// <summary>
+        /// Replace all templates with provided list and persist.
+        /// </summary>
+        public void ReplaceAllTemplates(IEnumerable<StatusTemplate> newTemplates)
+        {
+            if (newTemplates == null) return;
+            lock (lockObject)
+            {
+                templates = newTemplates.ToList();
+                SaveTemplates();
+            }
+        }
+
+        /// <summary>
+        /// Export current templates to a JSON file.
+        /// </summary>
+        public bool ExportTemplates(string exportPath)
+        {
+            try
+            {
+                List<StatusTemplate> snapshot;
+                lock (lockObject)
+                {
+                    snapshot = templates.ToList();
+                }
+                var json = Playnite.SDK.Data.Serialization.ToJson(snapshot, true);
+                File.WriteAllText(exportPath, json);
+                logger?.Info($"Exported {snapshot.Count} templates to: {exportPath}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger?.Error($"Failed to export templates: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Import templates from JSON file. If merge=true, merge by Id or Name; otherwise replace all.
+        /// </summary>
+        public bool ImportTemplates(string importPath, bool merge = true)
+        {
+            try
+            {
+                if (!File.Exists(importPath)) return false;
+                var json = File.ReadAllText(importPath);
+                var incoming = Playnite.SDK.Data.Serialization.FromJson<List<StatusTemplate>>(json) ?? new List<StatusTemplate>();
+
+                lock (lockObject)
+                {
+                    if (!merge)
+                    {
+                        templates = incoming;
+                    }
+                    else
+                    {
+                        // merge by Id, fallback by Name
+                        foreach (var t in incoming)
+                        {
+                            var existing = templates.FirstOrDefault(x => x.Id == t.Id)
+                                           ?? templates.FirstOrDefault(x => !string.IsNullOrEmpty(x.Name) &&
+                                                                            string.Equals(x.Name, t.Name, StringComparison.OrdinalIgnoreCase));
+                            if (existing == null)
+                            {
+                                templates.Add(t);
+                            }
+                            else
+                            {
+                                // update fields
+                                existing.Name = t.Name;
+                                existing.Description = t.Description;
+                                existing.DetailsFormat = t.DetailsFormat;
+                                existing.StateFormat = t.StateFormat;
+                                existing.Priority = t.Priority;
+                                existing.IsEnabled = t.IsEnabled;
+                                existing.Conditions = t.Conditions ?? existing.Conditions;
+                            }
+                        }
+                    }
+
+                    SaveTemplates();
+                }
+
+                logger?.Info($"Imported {incoming.Count} templates from: {importPath}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger?.Error($"Failed to import templates: {ex.Message}");
+                return false;
+            }
+        }
+
+
+
+        /// <summary>
         /// Loads templates from file or creates defaults
         /// </summary>
         private void LoadTemplates()
@@ -263,10 +358,11 @@ namespace DiscordRichPresencePlugin.Services
                 return false;
 
             // Check total playtime
-            if (conditions.MinPlaytimeMinutes.HasValue && (long)game.Playtime < conditions.MinPlaytimeMinutes.Value)
-                return false;
-            if (conditions.MaxPlaytimeMinutes.HasValue && (long)game.Playtime > conditions.MaxPlaytimeMinutes.Value)
-                return false;
+            var totalMinutes = (int)((game?.Playtime ?? 0) / 60);
+                        if (conditions.MinPlaytimeMinutes.HasValue && totalMinutes < conditions.MinPlaytimeMinutes.Value)
+                                return false;
+                        if (conditions.MaxPlaytimeMinutes.HasValue && totalMinutes > conditions.MaxPlaytimeMinutes.Value)
+                                return false;
 
             // Check completion
             if (conditions.CompletionPercentage != null && info != null)
@@ -339,7 +435,7 @@ namespace DiscordRichPresencePlugin.Services
             // Time-related
             var sessionTime = DateTime.UtcNow - sessionStart;
             result = result.Replace(TemplateVariables.SessionTime, FormatTimeSpan(sessionTime));
-            result = result.Replace(TemplateVariables.TotalPlaytime, FormatPlaytime((long)(game?.Playtime ?? 0)));
+            result = result.Replace(TemplateVariables.TotalPlaytime, FormatPlaytimeFromSeconds((long)(game?.Playtime ?? 0)));
             result = result.Replace(TemplateVariables.TimeOfDay, GetTimeOfDay());
             result = result.Replace(TemplateVariables.DayOfWeek, DateTime.Now.DayOfWeek.ToString());
 
@@ -395,11 +491,12 @@ namespace DiscordRichPresencePlugin.Services
             return $"{time.Minutes}m";
         }
 
-        private string FormatPlaytime(long minutes)
+        private string FormatPlaytimeFromSeconds(long seconds)
         {
-            if (minutes >= 60)
-                return $"{minutes / 60}h {minutes % 60}m";
-            return $"{minutes}m";
+            if (seconds <= 0) return "0m";
+           var hours = seconds / 3600;
+           var minutes = (seconds % 3600) / 60;
+            return hours > 0 ? $"{hours}h {minutes}m" : $"{minutes}m";
         }
 
         private string GetTimeOfDay()
