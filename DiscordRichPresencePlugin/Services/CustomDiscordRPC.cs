@@ -7,7 +7,8 @@ using System.IO.Pipes;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
+using Playnite.SDK.Data;
+
 
 namespace DiscordRichPresencePlugin.Services
 {
@@ -260,7 +261,7 @@ namespace DiscordRichPresencePlugin.Services
 
             try
             {
-                var json = JsonConvert.SerializeObject(payload);
+                var json = Serialization.ToJson(payload, false);
                 //logger.Debug($"Sending payload: {json}");
 
                 var data = Encoding.UTF8.GetBytes(json);
