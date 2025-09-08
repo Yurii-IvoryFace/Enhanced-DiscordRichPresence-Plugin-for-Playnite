@@ -1,6 +1,7 @@
 ﻿using DiscordRichPresencePlugin.Models;
 using Playnite.SDK;
 using Playnite.SDK.Data;
+using Playnite.SDK.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -25,6 +26,7 @@ namespace DiscordRichPresencePlugin.Services
 
             EnsureDirectoriesExist();
             LoadMappings();
+            EnsureMappingsFileExists();
         }
 
         private void EnsureDirectoriesExist()
@@ -59,31 +61,68 @@ namespace DiscordRichPresencePlugin.Services
                         var json = File.ReadAllText(mappingsFilePath);
                         mappings = Serialization.FromJson<GameMappings>(json);
 
-                        // Ensure collections are not null
+                        if (mappings == null)
+                        {
+                            mappings = new GameMappings { PlayniteLogo = Constants.DEFAULT_FALLBACK_IMAGE, Games = new List<GameMapping>() };
+                        }
+
+                        // back-compat для старого ключа playnite_logo
+                        if (string.IsNullOrWhiteSpace(mappings.PlayniteLogo))
+                        {
+                            var compat = Serialization.FromJson<CompatV1>(json);
+                            if (!string.IsNullOrWhiteSpace(compat?.playnite_logo))
+                            {
+                                mappings.PlayniteLogo = compat.playnite_logo;
+                            }
+                        }
+
                         if (mappings.Games == null)
                         {
                             mappings.Games = new List<GameMapping>();
                         }
 
-                        logger?.Debug($"Loaded {mappings.Games.Count} game mappings from file");
-
-                        // Додаткова валідація
-                        if (string.IsNullOrEmpty(mappings.PlayniteLogo))
+                        if (string.IsNullOrWhiteSpace(mappings.PlayniteLogo))
                         {
                             mappings.PlayniteLogo = Constants.DEFAULT_FALLBACK_IMAGE;
-                            logger?.Debug("Fixed empty PlayniteLogo");
                         }
+
+                        logger?.Debug($"Loaded {mappings.Games.Count} game mappings from file");
                     }
                     catch (Exception ex)
                     {
                         logger?.Error($"Failed to load mappings: {ex.Message}");
                         CreateDefaultMappings();
+                        SaveMappings();
                     }
                 }
                 else
                 {
-                    logger?.Debug("No existing mappings file found, creating default mappings");
                     CreateDefaultMappings();
+                    SaveMappings();
+                }
+            }
+        }
+
+        // DTO лише для читання snake_case поля
+        private class CompatV1 { public string playnite_logo { get; set; } }
+
+        public string GetMappingsFilePath() => mappingsFilePath;
+
+        public void EnsureMappingsFileExists()
+        {
+            lock (lockObject)
+            {
+                try
+                {
+                    if (!File.Exists(mappingsFilePath))
+                    {
+                        SaveMappings();
+                        logger?.Info($"Created mappings file at: {mappingsFilePath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger?.Error($"Failed to ensure mappings file exists: {ex.Message}");
                 }
             }
         }
@@ -110,6 +149,68 @@ namespace DiscordRichPresencePlugin.Services
 
                 return mapping?.Image ?? mappings?.PlayniteLogo ?? Constants.DEFAULT_FALLBACK_IMAGE;
             }
+        }
+
+        /// <summary>
+        /// Гарантує наявність мапінгу для заданої гри; якщо відсутній — створить slug і збереже.
+        /// Повертає ключ зображення.
+        /// </summary>
+        public string EnsureMappingForName(string gameName)
+        {
+            if (string.IsNullOrWhiteSpace(gameName))
+                return Constants.DEFAULT_FALLBACK_IMAGE;
+
+            lock (lockObject)
+            {
+                var existing = mappings.Games.FirstOrDefault(g =>
+                    string.Equals(g.Name, gameName, StringComparison.OrdinalIgnoreCase));
+
+                if (existing != null)
+                    return existing.Image;
+
+                var existingKeys = new HashSet<string>(mappings.Games.Select(m => m.Image ?? ""), StringComparer.OrdinalIgnoreCase);
+                var key = SlugifyImageKey(gameName, existingKeys);
+
+                mappings.Games.Add(new GameMapping { Name = gameName, Image = key });
+                SaveMappings();
+                logger?.Debug($"Added mapping: '{gameName}' -> '{key}'");
+                return key;
+            }
+        }
+
+        /// <summary>
+        /// Згенерувати відсутні мапінги для набору ігор. Повертає кількість доданих.
+        /// </summary>
+        public int GenerateMissingMappings(IEnumerable<Game> games)
+        {
+            if (games == null) return 0;
+
+            int added = 0;
+            lock (lockObject)
+            {
+                var existingNames = new HashSet<string>(mappings.Games.Select(m => m.Name), StringComparer.OrdinalIgnoreCase);
+                var existingKeys = new HashSet<string>(mappings.Games.Select(m => m.Image ?? ""), StringComparer.OrdinalIgnoreCase);
+
+                foreach (var game in games)
+                {
+                    if (game == null || string.IsNullOrWhiteSpace(game.Name)) continue;
+                    if (existingNames.Contains(game.Name)) continue;
+
+                    var key = SlugifyImageKey(game.Name, existingKeys);
+                    existingNames.Add(game.Name);
+                    existingKeys.Add(key);
+                    mappings.Games.Add(new GameMapping { Name = game.Name, Image = key });
+                    added++;
+                }
+
+                if (added > 0)
+                {
+                    SaveMappings();
+                    logger?.Info($"Generated {added} missing mappings.");
+                }
+            }
+
+            return added;
         }
 
         public void AddOrUpdateMapping(string gameName, string imageKey)
@@ -278,7 +379,7 @@ namespace DiscordRichPresencePlugin.Services
                     }
                     else
                     {
-                        // Merge mappings
+                        // Merge
                         foreach (var importedMapping in importedMappings.Games)
                         {
                             var existing = mappings.Games.FirstOrDefault(g =>
@@ -387,57 +488,35 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-        public MappingStatistics GetStatistics()
+        // ---- helpers ----
+
+        private static string SlugifyImageKey(string name, HashSet<string> existingKeys)
         {
-            lock (lockObject)
+            // нижній регістр, лише [a-z0-9_], обрізання до 64, унікалізація
+            var slug = System.Text.RegularExpressions.Regex
+                .Replace((name ?? "").ToLowerInvariant(), "[^a-z0-9]+", "_")
+                .Trim('_');
+
+            if (string.IsNullOrWhiteSpace(slug))
+                slug = "game";
+
+            if (slug.Length > 64)
+                slug = slug.Substring(0, 64).Trim('_');
+
+            var baseSlug = slug;
+            var i = 1;
+            while (existingKeys.Contains(slug))
             {
-                var stats = new MappingStatistics
+                slug = $"{baseSlug}_{i++}";
+                if (slug.Length > 64)
                 {
-                    TotalMappings = mappings?.Games?.Count ?? 0,
-                    DefaultImageMappings = mappings?.Games?.Count(g => g.Image == Constants.DEFAULT_FALLBACK_IMAGE) ?? 0
-                };
-
-                stats.CustomImageMappings = stats.TotalMappings - stats.DefaultImageMappings;
-
-                return stats;
+                    var trimLen = Math.Max(0, 64 - ("_" + i.ToString()).Length);
+                    baseSlug = baseSlug.Length > trimLen ? baseSlug.Substring(0, trimLen).Trim('_') : baseSlug;
+                    slug = $"{baseSlug}_{i}";
+                }
             }
+            return slug;
         }
-        //    public void DebugMappings(string testGameName)
-        //    {
-        //        logger?.Debug($"=== DEBUGGING MAPPINGS ===");
-        //        logger?.Debug($"Mappings file path: {mappingsFilePath}");
-        //        logger?.Debug($"File exists: {File.Exists(mappingsFilePath)}");
-
-        //        if (mappings == null)
-        //        {
-        //            logger?.Debug("Mappings object is NULL");
-        //            return;
-        //        }
-
-        //        logger?.Debug($"PlayniteLogo: '{mappings.PlayniteLogo}'");
-        //        logger?.Debug($"Games count: {mappings.Games?.Count ?? 0}");
-
-        //        if (mappings.Games != null)
-        //        {
-        //            logger?.Debug("All game mappings:");
-        //            foreach (var game in mappings.Games)
-        //            {
-        //                logger?.Debug($"  '{game.Name}' -> '{game.Image}'");
-
-        //                // Перевірка точного співпадіння з тестовою грою
-        //                if (string.Equals(game.Name, testGameName, StringComparison.OrdinalIgnoreCase))
-        //                {
-        //                    logger?.Debug($"  *** MATCH FOUND for '{testGameName}' ***");
-        //                }
-        //            }
-        //        }
-
-        //        // Тест пошуку
-        //        var result = GetImageKeyForGame(testGameName);
-        //        logger?.Debug($"GetImageKeyForGame('{testGameName}') returned: '{result}'");
-        //        logger?.Debug($"=== END DEBUG ===");
-        //    }
-        //}
 
         public class MappingStatistics
         {

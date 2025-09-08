@@ -7,7 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using DiscordRichPresencePlugin.Models;
+using System.Text.RegularExpressions;
 using IOPath = System.IO.Path;
 
 namespace DiscordRichPresencePlugin.Services
@@ -61,7 +61,7 @@ namespace DiscordRichPresencePlugin.Services
                 return (null, null);
             }
 
-            var assetKey = mappingService?.GetImageKeyForGame(game.Name);
+            var assetKey = mappingService?.EnsureMappingForName(game.Name);
             if (string.IsNullOrWhiteSpace(assetKey))
             {
                 logger?.Debug($"ImageManager: no mapping image key for '{game.Name}', skipping.");

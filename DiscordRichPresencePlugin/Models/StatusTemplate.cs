@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 
 namespace DiscordRichPresencePlugin.Models
 {
@@ -9,31 +8,20 @@ namespace DiscordRichPresencePlugin.Models
     /// </summary>
     public class StatusTemplate
     {
-        [JsonProperty("id")]
         public string Id { get; set; } = Guid.NewGuid().ToString();
-
-        [JsonProperty("name")]
         public string Name { get; set; }
-
-        [JsonProperty("description")]
         public string Description { get; set; }
 
-        [JsonProperty("detailsFormat")]
+        // formatting
         public string DetailsFormat { get; set; }
-
-        [JsonProperty("stateFormat")]
         public string StateFormat { get; set; }
 
-        [JsonProperty("conditions")]
         public TemplateConditions Conditions { get; set; } = new TemplateConditions();
 
-        [JsonProperty("priority")]
+        /// <summary>Higher value → higher priority (if you use such logic in TemplateService)</summary>
         public int Priority { get; set; } = 0;
 
-        [JsonProperty("isEnabled")]
         public bool IsEnabled { get; set; } = true;
-
-        [JsonProperty("isUserDefined")]
         public bool IsUserDefined { get; set; } = false;
     }
 
@@ -42,55 +30,34 @@ namespace DiscordRichPresencePlugin.Models
     /// </summary>
     public class TemplateConditions
     {
-        [JsonProperty("minPlaytime")]
+        // minutes (Playnite Playtime is seconds; convert in TemplateService)
         public int? MinPlaytimeMinutes { get; set; }
-
-        [JsonProperty("maxPlaytime")]
         public int? MaxPlaytimeMinutes { get; set; }
 
-        [JsonProperty("minSessionTime")]
+        // session minutes
         public int? MinSessionTimeMinutes { get; set; }
-
-        [JsonProperty("maxSessionTime")]
         public int? MaxSessionTimeMinutes { get; set; }
 
-        [JsonProperty("genres")]
         public List<string> Genres { get; set; } = new List<string>();
-
-        [JsonProperty("platforms")]
         public List<string> Platforms { get; set; } = new List<string>();
-
-        [JsonProperty("sources")]
         public List<string> Sources { get; set; } = new List<string>();
 
-        [JsonProperty("completionPercentage")]
         public CompletionRange CompletionPercentage { get; set; }
-
-        [JsonProperty("timeOfDay")]
         public TimeOfDayCondition TimeOfDay { get; set; }
 
-        [JsonProperty("hasMultiplayer")]
         public bool? HasMultiplayer { get; set; }
-
-        [JsonProperty("hasCoop")]
         public bool? HasCoop { get; set; }
     }
 
     public class CompletionRange
     {
-        [JsonProperty("min")]
         public int Min { get; set; } = 0;
-
-        [JsonProperty("max")]
         public int Max { get; set; } = 100;
     }
 
     public class TimeOfDayCondition
     {
-        [JsonProperty("startHour")]
         public int? StartHour { get; set; }
-
-        [JsonProperty("endHour")]
         public int? EndHour { get; set; }
     }
 
