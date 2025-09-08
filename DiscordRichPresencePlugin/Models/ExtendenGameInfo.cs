@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Newtonsoft.Json;
 using Playnite.SDK.Models;
 
 namespace DiscordRichPresencePlugin.Models
@@ -10,74 +9,51 @@ namespace DiscordRichPresencePlugin.Models
     /// </summary>
     public class ExtendedGameInfo
     {
-        [JsonProperty("gameId")]
         public Guid GameId { get; set; }
 
-        [JsonProperty("gameName")]
         public string GameName { get; set; }
 
         // Progress tracking
-        [JsonProperty("completionPercentage")]
         public int CompletionPercentage { get; set; } = 0;
 
-        [JsonProperty("achievementsEarned")]
         public int AchievementsEarned { get; set; } = 0;
-
-        [JsonProperty("totalAchievements")]
         public int TotalAchievements { get; set; } = 0;
 
         // Session statistics
-        [JsonProperty("currentSessionStart")]
         public DateTime CurrentSessionStart { get; set; }
 
-        [JsonProperty("sessionCount")]
         public int SessionCount { get; set; } = 0;
 
-        [JsonProperty("averageSessionLength")]
         public TimeSpan AverageSessionLength { get; set; }
-
-        [JsonProperty("longestSession")]
         public TimeSpan LongestSession { get; set; }
 
         // Ratings and scores
-        [JsonProperty("userRating")]
         public int? UserRating { get; set; }
-
-        [JsonProperty("communityScore")]
         public double? CommunityScore { get; set; }
-
-        [JsonProperty("criticScore")]
         public int? CriticScore { get; set; }
 
         // Multiplayer information
-        [JsonProperty("supportsMultiplayer")]
         public bool SupportsMultiplayer { get; set; } = false;
 
-        [JsonProperty("supportsCoop")]
         public bool SupportsCoop { get; set; } = false;
 
-        [JsonProperty("currentPlayerCount")]
         public int? CurrentPlayerCount { get; set; }
 
-        [JsonProperty("maxPlayerCount")]
+  
         public int? MaxPlayerCount { get; set; }
 
-        [JsonProperty("multiplayerMode")]
+
         public string MultiplayerMode { get; set; }
 
         // Store links
-        [JsonProperty("storeLinks")]
         public Dictionary<string, string> StoreLinks { get; set; } = new Dictionary<string, string>();
 
         // Social features
-        [JsonProperty("socialLinks")]
         public Dictionary<string, string> SocialLinks { get; set; } = new Dictionary<string, string>();
 
         // Custom metadata
-        [JsonProperty("customMetadata")]
         public Dictionary<string, string> CustomMetadata { get; set; } = new Dictionary<string, string>();
 
-        [JsonProperty("lastUpdated")]
         public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
 
         /// <summary>

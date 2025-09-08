@@ -335,7 +335,7 @@ namespace DiscordRichPresencePlugin.Services
                 // Sort by priority and return the highest priority match
                 if (matchingTemplates.Any())
                 {
-                    return matchingTemplates.OrderBy(t => t.Priority).First();
+                    return matchingTemplates.OrderByDescending(t => t.Priority).First();
                 }
 
                 return GetDefaultTemplate();
@@ -351,20 +351,16 @@ namespace DiscordRichPresencePlugin.Services
 
             var sessionMinutes = (int)(DateTime.UtcNow - sessionStart).TotalMinutes;
 
-            // Check session time
-            if (conditions.MinSessionTimeMinutes.HasValue && sessionMinutes < conditions.MinSessionTimeMinutes)
-                return false;
-            if (conditions.MaxSessionTimeMinutes.HasValue && sessionMinutes > conditions.MaxSessionTimeMinutes)
-                return false;
+            // session time
+            if (conditions.MinSessionTimeMinutes.HasValue && sessionMinutes < conditions.MinSessionTimeMinutes) return false;
+            if (conditions.MaxSessionTimeMinutes.HasValue && sessionMinutes > conditions.MaxSessionTimeMinutes) return false;
 
-            // Check total playtime
+            // total playtime (seconds → minutes)
             var totalMinutes = (int)((game?.Playtime ?? 0) / 60);
-                        if (conditions.MinPlaytimeMinutes.HasValue && totalMinutes < conditions.MinPlaytimeMinutes.Value)
-                                return false;
-                        if (conditions.MaxPlaytimeMinutes.HasValue && totalMinutes > conditions.MaxPlaytimeMinutes.Value)
-                                return false;
+            if (conditions.MinPlaytimeMinutes.HasValue && totalMinutes < conditions.MinPlaytimeMinutes.Value) return false;
+            if (conditions.MaxPlaytimeMinutes.HasValue && totalMinutes > conditions.MaxPlaytimeMinutes.Value) return false;
 
-            // Check completion
+            // completion
             if (conditions.CompletionPercentage != null && info != null)
             {
                 if (info.CompletionPercentage < conditions.CompletionPercentage.Min ||
@@ -372,7 +368,7 @@ namespace DiscordRichPresencePlugin.Services
                     return false;
             }
 
-            // Check time of day
+            // time of day
             if (conditions.TimeOfDay?.StartHour != null)
             {
                 var currentHour = DateTime.Now.Hour;
@@ -386,28 +382,40 @@ namespace DiscordRichPresencePlugin.Services
                 if (!inRange) return false;
             }
 
-            // Check genres
-            if (conditions.Genres?.Any() == true && game.Genres?.Any() == true)
+            // genres
+            if (conditions.Genres?.Any() == true)
             {
-                if (!game.Genres.Any(g => conditions.Genres.Contains(g.Name, StringComparer.OrdinalIgnoreCase)))
-                    return false;
+                if (game.Genres?.Any() == true)
+                {
+                    if (!game.Genres.Any(g => conditions.Genres.Contains(g.Name, StringComparer.OrdinalIgnoreCase)))
+                        return false;
+                }
+                else
+                {
+                    return false; // 🔧 якщо в умовах є жанри, а у гри немає — не підходить
+                }
             }
 
-            // Check platforms
-            if (conditions.Platforms?.Any() == true && game.Platforms?.Any() == true)
+            // platforms
+            if (conditions.Platforms?.Any() == true)
             {
-                if (!game.Platforms.Any(p => conditions.Platforms.Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
-                    return false;
+                if (game.Platforms?.Any() == true)
+                {
+                    if (!game.Platforms.Any(p => conditions.Platforms.Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
+                        return false;
+                }
+                else
+                {
+                    return false; // 🔧 аналогічно жанрам
+                }
             }
 
-            // Check multiplayer
+            // multiplayer/coop
             if (conditions.HasMultiplayer.HasValue && info != null)
             {
                 if (conditions.HasMultiplayer.Value != info.SupportsMultiplayer)
                     return false;
             }
-
-            // Check co-op
             if (conditions.HasCoop.HasValue && info != null)
             {
                 if (conditions.HasCoop.Value != info.SupportsCoop)

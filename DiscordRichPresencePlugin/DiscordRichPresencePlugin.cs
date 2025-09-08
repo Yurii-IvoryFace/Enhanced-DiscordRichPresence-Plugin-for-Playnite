@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Controls;
 
-
 namespace DiscordRichPresencePlugin
 {
     public class DiscordRichPresencePlugin : GenericPlugin
@@ -32,12 +31,15 @@ namespace DiscordRichPresencePlugin
             settings = new DiscordRichPresenceSettings(this);
             Properties = new GenericPluginProperties { HasSettings = true };
 
-
             currentAppId = string.IsNullOrWhiteSpace(settings.DiscordAppId)
-    ? Constants.DISCORD_APP_ID
-    : settings.DiscordAppId.Trim();
+                ? Constants.DISCORD_APP_ID
+                : settings.DiscordAppId.Trim();
             settings.ActiveAppId = currentAppId;
+
             mappingService = new GameMappingService(GetPluginUserDataPath(), logger);
+            mappingService.EnsureMappingsFileExists();
+            logger.Info($"[DRP] Mappings file: {mappingService.GetMappingsFilePath()}");
+
             templateService = new TemplateService(GetPluginUserDataPath(), logger);
             extendedInfoService = new ExtendedGameInfoService(GetPluginUserDataPath(), logger);
             buttonService = new ButtonService(logger, settings);
@@ -62,12 +64,12 @@ namespace DiscordRichPresencePlugin
                 PlayniteApi.Database.Games.ItemUpdated += OnGameItemUpdated;
             }
 
-            // Initialize Discord RPC service
             if (settings.EnableRichPresence)
             {
                 discordService.Initialize();
             }
         }
+
         public void ApplyNewDiscordAppId(string newId)
         {
             var target = string.IsNullOrWhiteSpace(newId) ? Constants.DISCORD_APP_ID : newId.Trim();
@@ -79,7 +81,7 @@ namespace DiscordRichPresencePlugin
             discordService?.Reinitialize(currentAppId);
             settings.ActiveAppId = currentAppId;
         }
-        // Public method to access mapping service for UI
+
         public GameMappingService GetGameMappingService() => mappingService;
         public ILogger GetLogger() => logger;
 
@@ -89,7 +91,7 @@ namespace DiscordRichPresencePlugin
             {
                 discordService.UpdateGamePresence(args.Game);
                 extendedInfoService?.StartSession(args.Game.Id);
-                var _ = imageManager.PrepareGameImage(args.Game);
+                var _ = imageManager.PrepareGameImage(args.Game); // Ensure mapping + asset
             }
         }
 
@@ -119,36 +121,6 @@ namespace DiscordRichPresencePlugin
             }
         }
 
-        /// <summary>
-        /// Робить стабільний ключ-синонім: нижній регістр, лише [a-z0-9_], без повторів, з урахуванням колізій.
-        /// </summary>
-        private string SlugifyImageKey(string name, HashSet<string> existingKeys)
-        {
-            var slug = System.Text.RegularExpressions.Regex
-                .Replace(name.ToLowerInvariant(), "[^a-z0-9]+", "_")
-                .Trim('_');
-
-            if (string.IsNullOrWhiteSpace(slug))
-                slug = "game";
-
-            if (slug.Length > 64)
-                slug = slug.Substring(0, 64).Trim('_');
-
-            var baseSlug = slug;
-            var i = 1;
-            while (existingKeys.Contains(slug))
-            {
-                slug = $"{baseSlug}_{i++}";
-                if (slug.Length > 64)
-                {
-                    var trimLen = Math.Max(0, 64 - ("_" + i.ToString()).Length);
-                    baseSlug = baseSlug.Length > trimLen ? baseSlug.Substring(0, trimLen).Trim('_') : baseSlug;
-                    slug = $"{baseSlug}_{i}";
-                }
-            }
-            return slug;
-        }
-
         private void GenerateAssetsForInstalledGames()
         {
             if (imageManager == null)
@@ -171,54 +143,26 @@ namespace DiscordRichPresencePlugin
             RunMappingAndAssetGeneration(games);
         }
 
-        private void RunMappingAndAssetGeneration(List<Playnite.SDK.Models.Game> games)
+        private void RunMappingAndAssetGeneration(List<Game> games)
         {
-            // один прогрес на все: спершу створення mappings, потім — ассети
             var options = new GlobalProgressOptions("Preparing mappings & assets...", true)
             {
                 IsIndeterminate = false
             };
 
-            int addedMappings = 0, processed = 0, skippedNoMapping = 0, errors = 0;
+            int addedMappings = 0, processed = 0, errors = 0;
 
             PlayniteApi.Dialogs.ActivateGlobalProgress(progress =>
             {
                 try
                 {
-                    // Оцінимо загальний прогрес: 1 "крок" на фазу mappings + по 1 на кожну гру для ассетів
                     progress.ProgressMaxValue = games.Count + 1;
 
-                    // === ФАЗА 1: створення/додавання відсутніх mappings (у фоні, без UI-контексту) ===
+                    // ФАЗА 1: централізовано через сервіс
                     progress.Text = "Creating mappings...";
                     try
                     {
-                        var existing = mappingService.GetAllMappings();
-                        var existingNames = new HashSet<string>(existing.Select(m => m.Name), StringComparer.OrdinalIgnoreCase);
-                        var existingKeys = new HashSet<string>(existing.Select(m => m.Image ?? ""), StringComparer.OrdinalIgnoreCase);
-
-                        var toAdd = new List<GameMapping>();
-                        foreach (var game in games)
-                        {
-                            if (progress.CancelToken.IsCancellationRequested) break;
-                            if (game == null || string.IsNullOrWhiteSpace(game.Name)) continue;
-                            if (existingNames.Contains(game.Name)) continue;
-
-                            var key = SlugifyImageKey(game.Name, existingKeys);
-                            existingKeys.Add(key);
-
-                            toAdd.Add(new GameMapping
-                            {
-                                Name = game.Name,
-                                Image = key
-                            });
-                        }
-
-                        if (toAdd.Count > 0)
-                        {
-                            // ⚠️ важливо: виконуємо на фоні, тому `.GetAwaiter().GetResult()` тут безпечний
-                            mappingService.BulkAddOrUpdateMappingsAsync(toAdd).ConfigureAwait(false).GetAwaiter().GetResult();
-                            addedMappings = toAdd.Count;
-                        }
+                        addedMappings = mappingService.GenerateMissingMappings(games);
                     }
                     catch (Exception ex)
                     {
@@ -226,10 +170,10 @@ namespace DiscordRichPresencePlugin
                     }
                     finally
                     {
-                        progress.CurrentProgressValue++; // завершили фазу mappings
+                        progress.CurrentProgressValue++;
                     }
 
-                    // === ФАЗА 2: підготовка ассетів ===
+                    // ФАЗА 2: ассети
                     foreach (var game in games)
                     {
                         if (progress.CancelToken.IsCancellationRequested)
@@ -238,16 +182,8 @@ namespace DiscordRichPresencePlugin
                         progress.Text = $"Generating asset: {game.Name}";
                         try
                         {
-                            var assetKey = mappingService?.GetImageKeyForGame(game.Name);
-                            if (string.IsNullOrWhiteSpace(assetKey))
-                            {
-                                skippedNoMapping++;
-                            }
-                            else
-                            {
-                                imageManager.PrepareGameImage(game);
-                                processed++;
-                            }
+                            imageManager.PrepareGameImage(game); // EnsureMapping всередині
+                            processed++;
                         }
                         catch (Exception ex)
                         {
@@ -267,12 +203,11 @@ namespace DiscordRichPresencePlugin
             }, options);
 
             PlayniteApi.Dialogs.ShowMessage(
-                $"Done.\nAdded mappings: {addedMappings}\nProcessed assets: {processed}\nNo mapping: {skippedNoMapping}\nErrors: {errors}",
+                $"Done.\nAdded mappings: {addedMappings}\nProcessed assets: {processed}\nErrors: {errors}",
                 "Discord Rich Presence");
 
             imageManager.OpenAssetsFolder();
         }
-
 
         public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args)
         {
@@ -280,20 +215,19 @@ namespace DiscordRichPresencePlugin
 
             return new[]
             {
-        new MainMenuItem
-        {
-            // Top-level підменю під Extensions
-            MenuSection = "@Discord Rich Presence",
-            Description = "Generate assets for installed games",
-            Action = _ => GenerateAssetsForInstalledGames()
-        },
-        new MainMenuItem
-        {
-            MenuSection = "@Discord Rich Presence",
-            Description = "Open assets folder",
-            Action = _ => imageManager?.OpenAssetsFolder()
-        }
-    };
+                new MainMenuItem
+                {
+                    MenuSection = "@Discord Rich Presence",
+                    Description = "Generate assets for installed games",
+                    Action = _ => GenerateAssetsForInstalledGames()
+                },
+                new MainMenuItem
+                {
+                    MenuSection = "@Discord Rich Presence",
+                    Description = "Open assets folder",
+                    Action = _ => imageManager?.OpenAssetsFolder()
+                }
+            };
         }
 
         public override void OnApplicationStopped(OnApplicationStoppedEventArgs args)
@@ -306,8 +240,6 @@ namespace DiscordRichPresencePlugin
         }
 
         public override ISettings GetSettings(bool firstRunSettings) => settings;
-
-
         public override UserControl GetSettingsView(bool firstRunSettings) => new DiscordRichPresenceSettingsView(imageManager);
     }
 }

@@ -1,22 +1,17 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Navigation;
-using Playnite.SDK;
-using System.Windows.Media;
-using DiscordRichPresencePlugin.Services;
-using DiscordRichPresencePlugin.Views;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Navigation;
+using Playnite.SDK;
+using DiscordRichPresencePlugin.Services;
+using DiscordRichPresencePlugin.Views;
+
 namespace DiscordRichPresencePlugin
 {
-    /// <summary>
-    /// Відображає налаштування Discord Rich Presence.
-    /// </summary>
     public partial class DiscordRichPresenceSettingsView : UserControl
     {
         private readonly ILogger logger = LogManager.GetLogger();
@@ -31,11 +26,11 @@ namespace DiscordRichPresencePlugin
             playniteApi = API.Instance;
             this.Loaded += OnLoadedAttachTemplateManager;
         }
+
         public DiscordRichPresenceSettingsView(ImageManagerService imageManager) : this()
         {
             this.imageManager = imageManager;
         }
-
 
         private void Reconnect_Click(object sender, RoutedEventArgs e)
         {
@@ -50,8 +45,9 @@ namespace DiscordRichPresencePlugin
                 return;
             }
 
-            s.RequestReconnect(); // викликає plugin.ApplyNewDiscordAppId(...)
+            s.RequestReconnect();
         }
+
         private void CopyActiveId_Click(object sender, RoutedEventArgs e)
         {
             if (DataContext is DiscordRichPresenceSettings s && !string.IsNullOrWhiteSpace(s.ActiveAppId))
@@ -62,13 +58,11 @@ namespace DiscordRichPresencePlugin
 
         private void AppIdBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            // дозволяємо вводити лише цифри
             e.Handled = !DigitsOnly.IsMatch(e.Text);
         }
 
         private void AppIdBox_OnPaste(object sender, DataObjectPastingEventArgs e)
         {
-            // блокуємо пастинг не-цифр і довжину > 19
             if (!e.DataObject.GetDataPresent(DataFormats.UnicodeText))
             {
                 e.CancelCommand();
@@ -86,8 +80,6 @@ namespace DiscordRichPresencePlugin
                 e.CancelCommand();
             }
         }
-
-
 
         private string GetPluginFolderPath()
         {
@@ -118,7 +110,7 @@ namespace DiscordRichPresencePlugin
             {
                 logger.Error($"Failed to open mappings folder: {ex.Message}");
                 playniteApi?.Dialogs.ShowErrorMessage(
-                    "Не вдалося відкрити папку зі схеми. Будь ласка, перевірте журнали для отримання додаткової інформації.",
+                    "Не вдалося відкрити папку зі схемою. Перевірте журнали.",
                     "Помилка"
                 );
             }
@@ -139,7 +131,7 @@ namespace DiscordRichPresencePlugin
             {
                 logger.Error($"Не вдалося відкрити URL-адресу: {ex.Message}");
                 playniteApi?.Dialogs.ShowErrorMessage(
-                    "Не вдалося відкрити URL-адресу. Будь ласка, перевірте журнали для отримання додаткової інформації.",
+                    "Не вдалося відкрити URL-адресу. Перевірте журнали.",
                     "Помилка"
                 );
             }
@@ -149,7 +141,6 @@ namespace DiscordRichPresencePlugin
         {
             try
             {
-                // шукаємо кнопку за Tag="templateManager", щоб не міняти XAML
                 var btn = FindChild<Button>(this, b => (b.Tag as string) == "templateManager");
                 if (btn != null)
                 {
@@ -174,7 +165,6 @@ namespace DiscordRichPresencePlugin
                 var vm = new TemplateManagerViewModel(templateService);
                 view.DataContext = vm;
 
-                // У options залишаємо тільки те, що підтримується
                 var window = playniteApi.Dialogs.CreateWindow(new WindowCreationOptions
                 {
                     ShowCloseButton = true,
@@ -182,7 +172,6 @@ namespace DiscordRichPresencePlugin
                     ShowMinimizeButton = true
                 });
 
-                // Налаштовуємо властивості ВЖЕ створеного вікна
                 window.Title = "Менеджер шаблонів";
                 window.Width = 900;
                 window.Height = 600;
@@ -212,7 +201,6 @@ namespace DiscordRichPresencePlugin
                     return;
                 }
 
-                // fallback: відкрити теку напряму, якщо з якоїсь причини сервіс не передали
                 var path = System.IO.Path.Combine(GetPluginFolderPath(), "assets");
                 if (!Directory.Exists(path)) Directory.CreateDirectory(path);
                 Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
@@ -224,15 +212,14 @@ namespace DiscordRichPresencePlugin
             }
         }
 
-        // універсальний пошук дочірнього елемента за предикатом
         private T FindChild<T>(DependencyObject parent, Func<T, bool> predicate) where T : DependencyObject
         {
             if (parent == null) return null;
 
-            var count = VisualTreeHelper.GetChildrenCount(parent);
+            var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
             for (int i = 0; i < count; i++)
             {
-                var child = VisualTreeHelper.GetChild(parent, i);
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
                 if (child is T typed && (predicate?.Invoke(typed) ?? true))
                     return typed;
 
