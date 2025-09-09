@@ -332,15 +332,34 @@ namespace DiscordRichPresencePlugin.Services
                     }
                 }
 
-                // Sort by priority and return the highest priority match
                 if (matchingTemplates.Any())
                 {
-                    return matchingTemplates.OrderByDescending(t => t.Priority).First();
+                    return matchingTemplates
+                        .OrderByDescending(t => t.Priority)
+                        .ThenByDescending(t => GetSpecificityScore(t.Conditions))
+                        .First();
                 }
 
                 return GetDefaultTemplate();
             }
         }
+
+        private static int GetSpecificityScore(TemplateConditions c)
+        {
+            if (c == null) return 0;
+            int s = 0;
+            if (c.MinPlaytimeMinutes.HasValue || c.MaxPlaytimeMinutes.HasValue) s++;
+            if (c.MinSessionTimeMinutes.HasValue || c.MaxSessionTimeMinutes.HasValue) s++;
+            if (c.Genres?.Count > 0) s += 2;
+            if (c.Platforms?.Count > 0) s += 2;
+            if (c.Sources?.Count > 0) s++;
+            if (c.CompletionPercentage != null) s++;
+            if (c.TimeOfDay?.StartHour != null || c.TimeOfDay?.EndHour != null) s++;
+            if (c.HasMultiplayer.HasValue) s++;
+            if (c.HasCoop.HasValue) s++;
+            return s;
+        }
+
 
         /// <summary>
         /// Checks if conditions match current game state
@@ -390,10 +409,7 @@ namespace DiscordRichPresencePlugin.Services
                     if (!game.Genres.Any(g => conditions.Genres.Contains(g.Name, StringComparer.OrdinalIgnoreCase)))
                         return false;
                 }
-                else
-                {
-                    return false; // 🔧 якщо в умовах є жанри, а у гри немає — не підходить
-                }
+                else return false;
             }
 
             // platforms
@@ -404,10 +420,7 @@ namespace DiscordRichPresencePlugin.Services
                     if (!game.Platforms.Any(p => conditions.Platforms.Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
                         return false;
                 }
-                else
-                {
-                    return false; // 🔧 аналогічно жанрам
-                }
+                else return false;
             }
 
             // multiplayer/coop
