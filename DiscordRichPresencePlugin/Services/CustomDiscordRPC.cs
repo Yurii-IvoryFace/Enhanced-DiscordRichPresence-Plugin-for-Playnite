@@ -7,6 +7,7 @@ using System.IO.Pipes;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 using Playnite.SDK.Data;
 
 
@@ -166,7 +167,7 @@ namespace DiscordRichPresencePlugin.Services
                                 // Якщо немає кнопок, не включаємо поле buttons взагалі
                                 (object)activity
                         },
-                        nonce = (++nonce).ToString()
+                        nonce = GetNextNonce().ToString()
                     };
 
                     await SendAsync(OpCode.Frame, payload);
@@ -208,7 +209,7 @@ namespace DiscordRichPresencePlugin.Services
                     {
                         cmd = "SET_ACTIVITY",
                         args = new { pid = System.Diagnostics.Process.GetCurrentProcess().Id },
-                        nonce = (++nonce).ToString()
+                        nonce = GetNextNonce().ToString()
                     };
 
                     await SendAsync(OpCode.Frame, payload);
@@ -222,27 +223,51 @@ namespace DiscordRichPresencePlugin.Services
             });
         }
 
+        private static async Task ReadExactAsync(Stream s, byte[] buffer, int length)
+        {
+            var read = 0;
+            while (read < length)
+            {
+                var n = await s.ReadAsync(buffer, read, length - read).ConfigureAwait(false);
+                if (n == 0)
+                {
+                    throw new EndOfStreamException("Discord IPC pipe closed while reading.");
+                }
+                read += n;
+            }
+        }
+
+
         private async Task<string> ReadResponseAsync()
         {
-            if (pipe == null || !pipe.IsConnected) return null;
+            if (pipe == null || !pipe.IsConnected)
+            {
+                return null;
+            }
 
             try
             {
+                // Discord IPC header: 8 bytes → [0..3] OpCode (int32 LE), [4..7] length (int32 LE)
                 var header = new byte[8];
-                await pipe.ReadAsync(header, 0, 8);
+                await ReadExactAsync(pipe, header, 8).ConfigureAwait(false);
 
                 var opCode = BitConverter.ToInt32(header, 0);
                 var length = BitConverter.ToInt32(header, 4);
 
-                //logger.Debug($"Reading response: OpCode={opCode}, Length={length}");
+                // Проста валідація довжини (запобігає OOM/помилкам)
+                const int MaxPayloadBytes = 1 << 20; // 1 MiB — з великим запасом
+                if (length < 0 || length > MaxPayloadBytes)
+                {
+                    throw new InvalidDataException($"Invalid Discord IPC payload length: {length}");
+                }
 
-                var data = new byte[length];
-                await pipe.ReadAsync(data, 0, length);
+                var payload = new byte[length];
+                if (length > 0)
+                {
+                    await ReadExactAsync(pipe, payload, length).ConfigureAwait(false);
+                }
 
-                var response = Encoding.UTF8.GetString(data);
-                //logger.Debug($"Response received: {response}");
-
-                return response;
+                return length > 0 ? Encoding.UTF8.GetString(payload) : string.Empty;
             }
             catch (Exception ex)
             {
@@ -270,9 +295,12 @@ namespace DiscordRichPresencePlugin.Services
                 BitConverter.GetBytes((int)opCode).CopyTo(header, 0);
                 BitConverter.GetBytes(data.Length).CopyTo(header, 4);
 
-                await pipe.WriteAsync(header, 0, header.Length);
-                await pipe.WriteAsync(data, 0, data.Length);
-                await pipe.FlushAsync();
+                await pipe.WriteAsync(header, 0, header.Length).ConfigureAwait(false);
+                if (data?.Length > 0)
+                {
+                    await pipe.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                }
+                await pipe.FlushAsync().ConfigureAwait(false);
 
                 //logger.Debug("Data sent successfully");
             }
@@ -282,6 +310,8 @@ namespace DiscordRichPresencePlugin.Services
                 isConnected = false;
             }
         }
+
+        private int GetNextNonce() => Interlocked.Increment(ref nonce);
 
         public void Dispose()
         {
