@@ -1,7 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using DiscordRichPresencePlugin.Helpers;
 using Playnite.SDK.Models;
+using System;
+using System.Collections.Generic;
 
+using DiscordRichPresencePlugin.Helpers;
 namespace DiscordRichPresencePlugin.Models
 {
     /// <summary>
@@ -73,7 +75,7 @@ namespace DiscordRichPresencePlugin.Models
             // Extract basic progress info if available
             if (game.CompletionStatus != null)
             {
-                info.CompletionPercentage = EstimateCompletionPercentage(game.CompletionStatus);
+                info.CompletionPercentage = ProgressUtils.EstimateCompletionPercentage(game.CompletionStatus);
             }
 
             // Extract ratings
@@ -133,29 +135,6 @@ namespace DiscordRichPresencePlugin.Models
             }
 
             return info;
-        }
-
-        private static int EstimateCompletionPercentage(CompletionStatus status)
-        {
-            // Map completion status to percentage
-            switch (status.Name?.ToLower())
-            {
-                case "not played":
-                case "unplayed":
-                    return 0;
-                case "playing":
-                case "in progress":
-                    return 25;
-                case "beaten":
-                case "main story":
-                    return 75;
-                case "completed":
-                case "100%":
-                case "completionist":
-                    return 100;
-                default:
-                    return 0;
-            }
         }
 
         /// <summary>

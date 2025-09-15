@@ -6,6 +6,7 @@ using Playnite.SDK.Models;
 using DiscordRichPresencePlugin.Enums;
 using DiscordRichPresencePlugin.Models;
 using DiscordRichPresencePlugin.Services;
+using DiscordRichPresencePlugin.Helpers;
 
 namespace DiscordRichPresencePlugin.Services
 {
@@ -144,7 +145,7 @@ namespace DiscordRichPresencePlugin.Services
                     StartTimestamp = startTimestamp,
                     LargeImageKey = GetGameImageKey(),
                     LargeImageText = currentGame.Name,
-                    SmallImageKey = "playnite_logo",
+                    SmallImageKey = Constants.DEFAULT_FALLBACK_IMAGE,
                     SmallImageText = "via Playnite",
                     Buttons = buttons
                 };
@@ -217,17 +218,7 @@ namespace DiscordRichPresencePlugin.Services
             // Total playtime (seconds -> H/M)
             if (settings.ShowPlaytime && currentGame.Playtime > 0)
             {
-                var totalSeconds = (long)currentGame.Playtime;
-                var hours = totalSeconds / 3600;
-                var minutes = (totalSeconds % 3600) / 60;
-                if (hours > 0)
-                {
-                    parts.Add($"{hours}h {minutes}m played");
-                }
-                else
-                {
-                    parts.Add($"{minutes}m played");
-                }
+                parts.Add(TimeFormat.FormatPlaytimeSeconds((long)currentGame.Playtime));
             }
 
             // Progress (from ExtendedGameInfo)
