@@ -299,14 +299,17 @@ namespace DiscordRichPresencePlugin.Services
 
                 // Weekend template
                 new StatusTemplate
-                {
-                    Name = "Weekend Warrior",
-                    Description = "Weekend gaming sessions",
-                    DetailsFormat = "Weekend gaming: {game}",
-                    StateFormat = "{dayOfWeek} | {sessionTime}",
-                    Priority = 4,
-                    Conditions = new TemplateConditions()
-                }
+{
+    Name = "Weekend Warrior",
+    Description = "Weekend gaming sessions",
+    DetailsFormat = "Weekend gaming: {game}",
+    StateFormat = "{dayOfWeek} | {sessionTime}",
+    Priority = 1,
+    Conditions = new TemplateConditions
+    {
+        DaysOfWeek = new List<DayOfWeek> { DayOfWeek.Saturday, DayOfWeek.Sunday }
+    }
+},
             };
 
             SaveTemplates();
@@ -355,6 +358,7 @@ namespace DiscordRichPresencePlugin.Services
             if (c.Sources?.Count > 0) s++;
             if (c.CompletionPercentage != null) s++;
             if (c.TimeOfDay?.StartHour != null || c.TimeOfDay?.EndHour != null) s++;
+            if (c.DaysOfWeek?.Count > 0) s++;
             if (c.HasMultiplayer.HasValue) s++;
             if (c.HasCoop.HasValue) s++;
             return s;
@@ -379,6 +383,12 @@ namespace DiscordRichPresencePlugin.Services
             if (conditions.MinPlaytimeMinutes.HasValue && totalMinutes < conditions.MinPlaytimeMinutes.Value) return false;
             if (conditions.MaxPlaytimeMinutes.HasValue && totalMinutes > conditions.MaxPlaytimeMinutes.Value) return false;
 
+
+            if (conditions.DaysOfWeek?.Any() == true)
+            {
+                if (!conditions.DaysOfWeek.Contains(DateTime.Now.DayOfWeek))
+                    return false;
+            }
             // completion
             if (conditions.CompletionPercentage != null && info != null)
             {
