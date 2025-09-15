@@ -99,30 +99,39 @@ namespace DiscordRichPresencePlugin.Services
                 var src = LoadBitmap(sourcePath);
                 var prepared = ResizeAndPadToRange(src, MinSizePx, MaxSizePx); // ⬅️ нова логіка
 
-                // 1) PNG спроба
+                // 1) PNG
                 SavePng(prepared, tmpPng);
                 var fileToUse = tmpPng;
-
                 var fi = new FileInfo(tmpPng);
+
                 if (fi.Length > MaxBytes)
                 {
-                    // 2) JPEG з пониженням якості
+                    logger?.Debug($"ImageManager: PNG too big for '{assetKey}' → {fi.Length} bytes > {MaxBytes}. Trying JPEG qualities...");
+
                     int[] qualities = new[] { 90, 85, 80, 75, 70, 65, 60, 55, 50 };
                     bool ok = false;
+                    int selectedQ = qualities.Last();
+
                     foreach (var q in qualities)
                     {
                         SaveJpeg(prepared, tmpJpg, q);
                         var fj = new FileInfo(tmpJpg);
+                        logger?.Debug($"ImageManager: JPEG q={q} → {fj.Length} bytes for '{assetKey}'");
+
                         if (fj.Length <= MaxBytes)
                         {
                             fileToUse = tmpJpg;
+                            selectedQ = q;
                             ok = true;
                             break;
                         }
                     }
+
                     if (!ok)
                     {
-                        fileToUse = tmpJpg; // остання спроба буде найменшою
+                        // останній tmpJpg і буде найменшим → залишаємо його
+                        fileToUse = tmpJpg;
+                        logger?.Debug($"ImageManager: JPEG still > limit at best effort; using q={selectedQ} for '{assetKey}'.");
                     }
 
                     TryDelete(tmpPng);
@@ -130,6 +139,7 @@ namespace DiscordRichPresencePlugin.Services
 
                 if (fileToUse == tmpPng)
                 {
+                    logger?.Debug($"ImageManager: using PNG for '{assetKey}' ({fi.Length} bytes).");
                     TryDelete(destPng);
                     if (File.Exists(destPng)) File.Delete(destPng);
                     File.Move(tmpPng, destPng);
@@ -139,10 +149,11 @@ namespace DiscordRichPresencePlugin.Services
                 }
                 else
                 {
+                    var fj = new FileInfo(tmpJpg);
+                    logger?.Debug($"ImageManager: using JPEG for '{assetKey}' ({fj.Length} bytes).");
                     TryDelete(destJpg);
                     if (File.Exists(destJpg)) File.Delete(destJpg);
                     File.Move(tmpJpg, destJpg);
-                    TryDelete(tmpPng);
                     UpdateManifest(assetKey, srcHash, destJpg);
                     return (destJpg, assetKey);
                 }
@@ -213,6 +224,40 @@ namespace DiscordRichPresencePlugin.Services
             {
                 logger?.Error($"ImageManager: failed to open assets folder: {ex.Message}");
             }
+        }
+
+        public int CleanupOrphanAssets()
+        {
+            var removed = 0;
+            try
+            {
+                // Ключі з маніфесту = валідні assetKey
+                var keys = new HashSet<string>(manifest.Keys, StringComparer.OrdinalIgnoreCase);
+
+                // Резервні ключі, які не видаляємо навіть якщо не в маніфесті
+                keys.Add(Constants.DEFAULT_FALLBACK_IMAGE); // напр., "playnite_logo"
+
+                foreach (var file in Directory.EnumerateFiles(assetsDir, "*.*", SearchOption.TopDirectoryOnly))
+                {
+                    var ext = IOPath.GetExtension(file)?.ToLowerInvariant();
+                    if (ext != ".png" && ext != ".jpg" && ext != ".jpeg")
+                        continue;
+
+                    var baseName = IOPath.GetFileNameWithoutExtension(file);
+                    if (!keys.Contains(baseName))
+                    {
+                        TryDelete(file);
+                        removed++;
+                    }
+                }
+
+                logger?.Info($"ImageManager: cleaned {removed} orphan asset file(s).");
+            }
+            catch (Exception ex)
+            {
+                logger?.Error($"ImageManager: CleanupOrphanAssets failed: {ex.Message}");
+            }
+            return removed;
         }
 
         // ===== Internals =====

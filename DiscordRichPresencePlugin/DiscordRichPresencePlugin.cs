@@ -37,7 +37,7 @@ namespace DiscordRichPresencePlugin
             settings.ActiveAppId = currentAppId;
 
             mappingService = new GameMappingService(GetPluginUserDataPath(), logger);
-            mappingService.EnsureMappingsFileExists();
+            mappingService.EnsureMappingsStorage();
             logger.Info($"[DRP] Mappings file: {mappingService.GetMappingsFilePath()}");
 
             templateService = new TemplateService(GetPluginUserDataPath(), logger);
@@ -226,7 +226,18 @@ namespace DiscordRichPresencePlugin
                     MenuSection = "@Discord Rich Presence",
                     Description = "Open assets folder",
                     Action = _ => imageManager?.OpenAssetsFolder()
-                }
+                },
+                new MainMenuItem
+{
+    MenuSection = "@Discord Rich Presence",
+    Description = "Clean unused assets",
+    Action = _ =>
+    {
+        var removed = imageManager.CleanupOrphanAssets();
+        PlayniteApi?.Dialogs?.ShowMessage($"Removed {removed} orphan asset file(s).", "Discord Rich Presence");
+        imageManager.OpenAssetsFolder();
+    }
+},
             };
         }
 
