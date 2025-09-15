@@ -462,3 +462,4 @@ namespace DiscordRichPresencePlugin.Services
         }
     }
 }
+

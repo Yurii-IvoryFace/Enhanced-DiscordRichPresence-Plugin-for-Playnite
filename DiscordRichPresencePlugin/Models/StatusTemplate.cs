@@ -98,3 +98,4 @@ namespace DiscordRichPresencePlugin.Models
         public const string SessionPhrase = "{phrase}";
     }
 }
+

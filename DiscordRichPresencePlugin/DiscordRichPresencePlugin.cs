@@ -243,3 +243,4 @@ namespace DiscordRichPresencePlugin
         public override UserControl GetSettingsView(bool firstRunSettings) => new DiscordRichPresenceSettingsView(imageManager);
     }
 }
+

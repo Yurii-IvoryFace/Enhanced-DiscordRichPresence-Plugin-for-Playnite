@@ -8,4 +8,5 @@ namespace DiscordRichPresencePlugin.Enums
         Ping = 3,
         Pong = 4
     }
+
 }

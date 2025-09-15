@@ -87,6 +87,7 @@
     /// <summary>
     /// Status update triggers
     /// </summary>
+
     public enum UpdateTrigger
     {
         GameStart,
