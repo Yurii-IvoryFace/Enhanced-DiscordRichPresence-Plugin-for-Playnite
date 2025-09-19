@@ -6,19 +6,22 @@ using Playnite.SDK;
 using DiscordRichPresencePlugin.Models;
 using DiscordRichPresencePlugin.Services;
 
-namespace DiscordRichPresencePlugin.Views
+namespace DiscordRichPresencePlugin.UI
 {
     public class TemplateManagerViewModel : ObservableObject
     {
         private readonly ILogger logger = LogManager.GetLogger();
         private readonly TemplateService templateService;
 
+
+        public RelayCommand GenerateTemplateCommand { get; private set; }
         public ObservableCollection<StatusTemplate> Templates { get; } =
             new ObservableCollection<StatusTemplate>();
 
         public TemplateManagerViewModel(TemplateService service)
         {
             templateService = service ?? throw new ArgumentNullException(nameof(service));
+            GenerateTemplateCommand = new RelayCommand(() => GenerateTemplate());
             Refresh();
         }
 
@@ -89,6 +92,18 @@ namespace DiscordRichPresencePlugin.Views
                 error = ex.Message;
                 logger.Error($"Failed to import templates: {ex}");
                 return false;
+            }
+        }
+        private void GenerateTemplate()
+        {
+            // TODO: implement smart generator (ML/heuristics) later.
+            // For now just inform user; you can also prefill a basic template here.
+            var api = API.Instance;
+            if (api != null)
+            {
+                api.Dialogs.ShowMessage(
+                    "Template generator is coming soon. This button is a stub for now.",
+                    "Template Manager");
             }
         }
     }

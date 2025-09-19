@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Playnite.SDK;
 
-namespace DiscordRichPresencePlugin.Views
+namespace DiscordRichPresencePlugin.UI
 {
     public partial class TemplateManagerView : UserControl
     {

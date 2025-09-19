@@ -3,7 +3,6 @@ using Playnite.SDK.Models;
 using System;
 using System.Collections.Generic;
 
-using DiscordRichPresencePlugin.Helpers;
 namespace DiscordRichPresencePlugin.Models
 {
     /// <summary>

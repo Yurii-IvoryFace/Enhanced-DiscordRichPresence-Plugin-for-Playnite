@@ -1,5 +1,4 @@
-﻿using DiscordRichPresencePlugin.Models;
-using DiscordRichPresencePlugin.Services;
+﻿using DiscordRichPresencePlugin.Services;
 using Playnite.SDK;
 using Playnite.SDK.Events;
 using Playnite.SDK.Models;
@@ -7,7 +6,12 @@ using Playnite.SDK.Plugins;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows;
 using System.Windows.Controls;
+using System.IO;
+
+using TMNS = DiscordRichPresencePlugin.UI;
+
 
 namespace DiscordRichPresencePlugin
 {
@@ -209,6 +213,55 @@ namespace DiscordRichPresencePlugin
             imageManager.OpenAssetsFolder();
         }
 
+        public void ShowTemplateManagerWindow()
+        {
+            try
+            {
+                // 1) Шлях до користувацьких даних плагіна
+                var pluginUserDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Playnite",
+                    "ExtensionsData",
+                    "7ad84e05-6c01-4b13-9b12-86af81775396"
+                );
+
+                // 2) Логер Playnite
+                var logger = LogManager.GetLogger();
+
+                // 3) Створюємо TemplateService з потрібними залежностями
+                var templateService = new TemplateService(pluginUserDataPath, logger);
+
+                // 4) Вікно менеджера шаблонів
+                var view = new TMNS.TemplateManagerView();
+                var vm = new TMNS.TemplateManagerViewModel(templateService);
+                view.DataContext = vm;
+
+                var wnd = PlayniteApi.Dialogs.CreateWindow(new WindowCreationOptions
+                {
+                    ShowCloseButton = true,
+                    ShowMaximizeButton = true,
+                    ShowMinimizeButton = true
+                });
+
+                wnd.Title = "Template Manager";
+                wnd.Width = 900;
+                wnd.Height = 600;
+                wnd.ResizeMode = ResizeMode.CanResize;
+                wnd.SizeToContent = SizeToContent.Manual;
+                wnd.Owner = null;
+                wnd.Content = view;
+                wnd.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                LogManager.GetLogger().Error($"ShowTemplateManagerWindow failed: {ex}");
+                PlayniteApi.Dialogs.ShowErrorMessage(
+                    "Failed to open Template Manager. See logs for details.",
+                    "Discord Rich Presence");
+            }
+        }
+
+
         public override IEnumerable<MainMenuItem> GetMainMenuItems(GetMainMenuItemsArgs args)
         {
             logger.Debug("GetMainMenuItems called (Discord Rich Presence)");
@@ -251,7 +304,10 @@ namespace DiscordRichPresencePlugin
         }
 
         public override ISettings GetSettings(bool firstRunSettings) => settings;
-        public override UserControl GetSettingsView(bool firstRunSettings) => new DiscordRichPresenceSettingsView(imageManager);
+        public override UserControl GetSettingsView(bool firstRunSettings)
+        {
+            return new global::DiscordRichPresencePlugin_UI.DiscordRichPresenceSettingsView(settings, imageManager, ShowTemplateManagerWindow);
+        }
     }
 }
 
