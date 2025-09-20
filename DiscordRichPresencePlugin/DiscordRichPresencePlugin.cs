@@ -49,7 +49,7 @@ namespace DiscordRichPresencePlugin
             buttonService = new ButtonService(logger, settings);
             imageManager = new ImageManagerService(PlayniteApi, logger, mappingService, GetPluginUserDataPath());
 
-            templateService.ApplyEnabledSet(settings.EnabledTemplateIds, persist: false);
+
 
             discordService = new DiscordRpcService(
                 currentAppId,

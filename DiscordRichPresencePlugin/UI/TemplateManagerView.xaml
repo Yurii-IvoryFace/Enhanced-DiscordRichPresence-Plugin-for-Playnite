@@ -26,7 +26,14 @@
         <SolidColorBrush x:Key="HeaderForegroundBrush"
                    Color="{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"
                    Opacity="0.95"/>
+        <SolidColorBrush x:Key="SelectedRowBrush"
+                 Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"
+                 Opacity="1"/>
 
+        <SolidColorBrush x:Key="SelectedRowUnfocusedBrush"
+                 Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"
+                 Opacity="0.35"/>
+        
         <Style x:Key="SectionHeader" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{StaticResource HeaderForegroundBrush}"/>
@@ -74,23 +81,33 @@
             <Setter Property="Height" Value="28"/>
         </Style>
 
+        <!--  DataGrid -->
         <Style x:Key="TemplateRowStyle" TargetType="{x:Type DataGridRow}">
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="MinHeight" Value="28"/>
-            <!-- захист від занадто низьких рядків -->
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                    <Setter Property="Background" Value="{StaticResource SelectedRowBrush}"/>
                     <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
                 </Trigger>
-                <DataTrigger Binding="{Binding IsEnabled}" Value="True">
-                    <Setter Property="Background" Value="{StaticResource ActiveRowBrush}"/>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsSelected" Value="True"/>
+                        <Condition Property="IsKeyboardFocusWithin" Value="False"/>
+                    </MultiTrigger.Conditions>
+                    <Setter Property="Background" Value="{StaticResource SelectedRowUnfocusedBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                </MultiTrigger>
+
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsEnabled}" Value="True"/>
+                        <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=IsSelected}" Value="False"/>
+                    </MultiDataTrigger.Conditions>
                     <Setter Property="FontWeight" Value="SemiBold"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding IsEnabled}" Value="False">
-                    <Setter Property="Opacity" Value="0.85"/>
-                </DataTrigger>
+                    <Setter Property="Background" Value="{StaticResource ActiveRowBrush}"/>
+                </MultiDataTrigger>
             </Style.Triggers>
         </Style>
 
@@ -98,8 +115,14 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="6,6"/>
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
-
         <Style x:Key="SelectedTextBox" TargetType="TextBox">
             <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -165,10 +188,9 @@
             <Border Background="{StaticResource PanelTintBrush}"
               BorderBrush="{StaticResource PanelBorderBrush}"
               BorderThickness="1" CornerRadius="6" Padding="6">
-                <DataGrid ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}"
-            AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                <DataGrid x:Name="TemplatesGrid" ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}"
+            AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
             HeadersVisibility="Column" RowStyle="{StaticResource TemplateRowStyle}"
-            AlternationCount="2" AlternatingRowBackground="{StaticResource AltRowBrush}"
             Background="Transparent" GridLinesVisibility="None" BorderThickness="0"
             ColumnHeaderStyle="{StaticResource GridHeaderStyle}">
                     <DataGrid.Columns>

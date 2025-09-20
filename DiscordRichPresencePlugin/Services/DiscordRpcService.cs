@@ -170,15 +170,32 @@ namespace DiscordRichPresencePlugin.Services
                     var formatted = templateService.FormatTemplateString(
                         t.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
                     if (!string.IsNullOrWhiteSpace(formatted))
+                    {
+                        logger.Debug($"[DRP][Templates] Using template for Details: '{t.Name}' (Priority={t.Priority})");
                         return formatted;
+                    }
+                    else
+                    {
+                        logger.Debug($"[DRP][Templates] Template '{t?.Name}' produced empty Details, will fallback.");
+                    }
+                }
+                else
+                {
+                    logger.Debug("[DRP][Templates] No matching template for Details (UseTemplates=ON).");
                 }
             }
 
-            var template = string.IsNullOrEmpty(settings.CustomStatus)
+            // Fallback: CustomStatus / default
+            var tmpl = string.IsNullOrWhiteSpace(settings.CustomStatus)
                 ? Constants.DEFAULT_STATUS_FORMAT
                 : settings.CustomStatus;
 
-            return template.Replace("{game}", currentGame.Name);
+            var fb = templateService != null
+                ? templateService.FormatTemplateString(tmpl, currentGame, currentExtendedInfo, gameStartTime)
+                : tmpl.Replace("{game}", currentGame.Name);
+
+            logger.Debug($"[DRP][Fallback] Details='{fb}'");
+            return fb;
         }
 
         private string FormatGameState()
@@ -193,7 +210,18 @@ namespace DiscordRichPresencePlugin.Services
                     var formatted = templateService.FormatTemplateString(
                         t.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
                     if (!string.IsNullOrWhiteSpace(formatted))
+                    {
+                        logger.Debug($"[DRP][Templates] Using template for State: '{t.Name}' (Priority={t.Priority})");
                         return formatted;
+                    }
+                    else
+                    {
+                        logger.Debug($"[DRP][Templates] Template '{t?.Name}' produced empty State, will fallback.");
+                    }
+                }
+                else
+                {
+                    logger.Debug("[DRP][Templates] No matching template for State (UseTemplates=ON).");
                 }
             }
 
@@ -234,8 +262,9 @@ namespace DiscordRichPresencePlugin.Services
             {
                 parts.Add($"🏆 {currentExtendedInfo.AchievementsEarned}/{currentExtendedInfo.TotalAchievements}");
             }
-
-            return string.Join(" | ", parts);
+            var state = string.Join(" · ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+            logger.Debug($"[DRP][Fallback] State='{state}'");
+            return state;
         }
 
         private string GetGameImageKey()

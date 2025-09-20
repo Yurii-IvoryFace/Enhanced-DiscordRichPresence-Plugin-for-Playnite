@@ -27,12 +27,16 @@ namespace DiscordRichPresencePlugin.UI
         {
             if (VM == null) return;
             VM.AddNew();
+            TemplatesGrid?.Items.Refresh();
+
         }
 
         private void BtnDuplicate_Click(object sender, RoutedEventArgs e)
         {
             if (VM == null || VM.SelectedTemplate == null) return;
             VM.DuplicateSelected();
+            TemplatesGrid?.Items.Refresh();
+
         }
 
         private void BtnRemove_Click(object sender, RoutedEventArgs e)
@@ -47,6 +51,8 @@ namespace DiscordRichPresencePlugin.UI
             if (res == MessageBoxResult.Yes)
             {
                 VM.RemoveSelected();
+                TemplatesGrid?.Items.Refresh();
+
             }
         }
 
@@ -54,12 +60,16 @@ namespace DiscordRichPresencePlugin.UI
         {
             if (VM == null) return;
             VM.MoveSelectedUp();
+            TemplatesGrid?.Items.Refresh();
+
         }
 
         private void BtnMoveDown_Click(object sender, RoutedEventArgs e)
         {
             if (VM == null) return;
             VM.MoveSelectedDown();
+            TemplatesGrid?.Items.Refresh();
+
         }
 
         private void BtnRefresh_Click(object sender, RoutedEventArgs e)
@@ -134,7 +144,7 @@ namespace DiscordRichPresencePlugin.UI
         private void BtnGenerate_Click(object sender, RoutedEventArgs e)
         {
             if (VM == null) return;
-            VM.GenerateTemplateStub(); // поки заглушка
+            VM.GenerateTemplateStub();
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)

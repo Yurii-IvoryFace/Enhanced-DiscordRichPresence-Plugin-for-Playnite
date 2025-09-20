@@ -49,9 +49,22 @@ namespace DiscordRichPresencePlugin.Services
         public void ReplaceAllTemplates(IEnumerable<StatusTemplate> newTemplates)
         {
             if (newTemplates == null) return;
+
             lock (lockObject)
             {
-                templates = newTemplates.ToList();
+                var list = newTemplates.ToList();
+
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var t in list)
+                {
+                    if (string.IsNullOrWhiteSpace(t.Id) || !seen.Add(t.Id))
+                    {
+                        t.Id = Guid.NewGuid().ToString();
+                        seen.Add(t.Id);
+                    }
+                }
+
+                templates = list;
                 NormalizePriorities(templates);
                 SaveTemplates();
             }
@@ -95,19 +108,16 @@ namespace DiscordRichPresencePlugin.Services
                     }
                     else
                     {
-                        // змерджити по Id/Name
                         var byId = templates.ToDictionary(t => t.Id, StringComparer.OrdinalIgnoreCase);
                         foreach (var t in incoming)
                         {
                             if (!string.IsNullOrEmpty(t.Id) && byId.ContainsKey(t.Id))
                             {
-                                // оновити існуючий
                                 var dst = byId[t.Id];
                                 CopyInto(dst, t);
                             }
                             else
                             {
-                                // спроба по імені
                                 var sameName = templates.FirstOrDefault(x =>
                                     !string.IsNullOrEmpty(x.Name) &&
                                     x.Name.Equals(t.Name, StringComparison.OrdinalIgnoreCase));
@@ -158,7 +168,7 @@ namespace DiscordRichPresencePlugin.Services
                 if (!File.Exists(templatesFilePath))
                 {
                     templates = new List<StatusTemplate>();
-                    SaveTemplates(); // створити пустий файл, щоб користувач бачив де він
+                    SaveTemplates();
                     return;
                 }
 
@@ -181,27 +191,42 @@ namespace DiscordRichPresencePlugin.Services
         public StatusTemplate SelectTemplate(Game game, ExtendedGameInfo extendedInfo, DateTime sessionStart)
         {
             if (game == null)
-                return null; // Більше НЕ повертаємо дефолт тут
+                return null; 
 
-            List<StatusTemplate> snapshot;
+            List<StatusTemplate> enabled;
             lock (lockObject)
             {
-                snapshot = templates.Where(t => t.IsEnabled).ToList();
-            }
+                logger?.Debug($"[Templates] Total templates: {templates.Count}");
+                logger?.Debug($"[Templates] Enabled templates: {templates.Count(t => t.IsEnabled)}");
+                if (templates.Any())
+                {
+                    foreach (var t in templates.Take(3))
+                    {
+                        logger?.Debug($"  - {t.Name}: Enabled={t.IsEnabled}, Priority={t.Priority}");
+                    }
+                }
 
-            var candidates = snapshot
+
+                enabled = templates.Where(t => t.IsEnabled).ToList();
+            }
+            logger?.Debug($"[Templates] Game: {game.Name}, Genres: {string.Join(", ", game.Genres?.Select(g => g.Name) ?? new[] { "none" })}");
+            if (enabled.Count == 0)
+                return null;
+
+            var candidates = enabled
                 .Where(t => MatchesConditions(t.Conditions, game, extendedInfo, sessionStart))
                 .ToList();
 
             if (candidates.Count == 0)
-                return null; // Ніяких “зашитих” дефолтів — фолбек робимо в DiscordRpcService
+                return null;
 
-            // Чим більш специфічні умови — тим вище; за рівних умов — нижчий Priority кращий (1 найвищий)
+            // Найбільш специфічний → далі пріоритет зростання (де 1 — найвищий)
             return candidates
                 .OrderByDescending(t => GetSpecificityScore(t.Conditions))
                 .ThenBy(t => t.Priority)
                 .First();
         }
+
 
 
         private static int GetSpecificityScore(TemplateConditions c)
@@ -268,7 +293,7 @@ namespace DiscordRichPresencePlugin.Services
 
             // Basic game info
             result = result.Replace(TemplateVariables.GameName, game?.Name ?? "Unknown");
-            result = result.Replace(TemplateVariables.Platform, game?.Platforms?.FirstOrDefault()?.Name ?? "PC");
+            //result = result.Replace(TemplateVariables.Platform, game?.Platforms?.FirstOrDefault()?.Name ?? "PC");
             result = result.Replace(TemplateVariables.Source, game?.Source?.Name ?? "");
             result = result.Replace(TemplateVariables.Genre, game?.Genres?.FirstOrDefault()?.Name ?? "");
 
@@ -350,15 +375,26 @@ namespace DiscordRichPresencePlugin.Services
 
         public void ApplyEnabledSet(IEnumerable<string> enabledIds, bool persist = false)
         {
-            if (enabledIds == null) return;
-            var set = new HashSet<string>(enabledIds, StringComparer.OrdinalIgnoreCase);
+            if (enabledIds == null || !enabledIds.Any())
+            {
+                logger?.Debug("[Templates] EnabledIds is empty, keeping templates as-is");
+                return;
+            }
+
+            var set = new HashSet<string>(enabledIds.Where(id => !string.IsNullOrWhiteSpace(id)),
+                                          StringComparer.OrdinalIgnoreCase);
 
             lock (lockObject)
             {
                 foreach (var t in templates)
                 {
+                    if (string.IsNullOrWhiteSpace(t.Id))
+                    {
+                        t.Id = Guid.NewGuid().ToString();
+                    }
                     t.IsEnabled = set.Contains(t.Id);
                 }
+
                 if (persist)
                 {
                     SaveTemplates();
