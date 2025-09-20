@@ -23,14 +23,13 @@ namespace DiscordRichPresencePlugin
         private int updateInterval = Constants.MIN_UPDATE_INTERVAL;
         private bool showElapsedTime = true;
         private string fallbackImageKey = Constants.DEFAULT_FALLBACK_IMAGE;
-        private bool useTemplates = true;
+        private bool useTemplates = false;
         private List<string> enabledTemplateIds = new List<string>();
         private bool showCompletionPercentage = true;
         private bool showAchievements = true;
         private Enums.ButtonDisplayMode buttonMode = Enums.ButtonDisplayMode.Auto;
         private string discordAppId = Constants.DISCORD_APP_ID;
         private string activeAppId;
-
 
         public string DiscordAppId
         {

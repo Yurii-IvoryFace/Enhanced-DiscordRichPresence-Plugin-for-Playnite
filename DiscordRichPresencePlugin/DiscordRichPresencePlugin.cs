@@ -49,6 +49,8 @@ namespace DiscordRichPresencePlugin
             buttonService = new ButtonService(logger, settings);
             imageManager = new ImageManagerService(PlayniteApi, logger, mappingService, GetPluginUserDataPath());
 
+            templateService.ApplyEnabledSet(settings.EnabledTemplateIds, persist: false);
+
             discordService = new DiscordRpcService(
                 currentAppId,
                 logger,
@@ -244,7 +246,7 @@ namespace DiscordRichPresencePlugin
                 });
 
                 wnd.Title = "Template Manager";
-                wnd.Width = 900;
+                wnd.Width = 1280;
                 wnd.Height = 600;
                 wnd.ResizeMode = ResizeMode.CanResize;
                 wnd.SizeToContent = SizeToContent.Manual;

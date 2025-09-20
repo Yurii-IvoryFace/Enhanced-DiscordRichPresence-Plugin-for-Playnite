@@ -1,10 +1,10 @@
-﻿using System;
+﻿using DiscordRichPresencePlugin.Models;
+using DiscordRichPresencePlugin.Services;
+using Playnite.SDK;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using Playnite.SDK;
-using DiscordRichPresencePlugin.Models;
-using DiscordRichPresencePlugin.Services;
 
 namespace DiscordRichPresencePlugin.UI
 {
@@ -13,27 +13,113 @@ namespace DiscordRichPresencePlugin.UI
         private readonly ILogger logger = LogManager.GetLogger();
         private readonly TemplateService templateService;
 
+        public ObservableCollection<StatusTemplate> Templates { get; } = new ObservableCollection<StatusTemplate>();
 
-        public RelayCommand GenerateTemplateCommand { get; private set; }
-        public ObservableCollection<StatusTemplate> Templates { get; } =
-            new ObservableCollection<StatusTemplate>();
-
-        public TemplateManagerViewModel(TemplateService service)
+        private StatusTemplate _selectedTemplate;
+        public StatusTemplate SelectedTemplate
         {
-            templateService = service ?? throw new ArgumentNullException(nameof(service));
-            GenerateTemplateCommand = new RelayCommand(() => GenerateTemplate());
+            get => _selectedTemplate;
+            set => SetValue(ref _selectedTemplate, value);
+        }
+
+        // Active list for the right pane
+        public System.Collections.Generic.IEnumerable<StatusTemplate> ActiveTemplates
+            => Templates.Where(t => t.IsEnabled).OrderBy(t => t.Priority);
+
+        public TemplateManagerViewModel(TemplateService templateService)
+        {
+            this.templateService = templateService ?? throw new ArgumentNullException(nameof(templateService));
             Refresh();
         }
 
         public void Refresh()
         {
             Templates.Clear();
-            var list = templateService?.GetAllTemplates() ?? new List<StatusTemplate>();
-            foreach (var t in list.OrderBy(t => t.Priority).ThenBy(t => t.Name))
+            foreach (var t in templateService.GetAllTemplates().OrderBy(x => x.Priority))
             {
                 Templates.Add(t);
             }
-            logger.Debug($"TemplateManagerViewModel: loaded {Templates.Count} templates");
+            RecalculatePriorities();
+            OnPropertyChanged(nameof(ActiveTemplates));
+        }
+
+        public void RecalculatePriorities()
+        {
+            // Top row gets priority 1
+            for (int i = 0; i < Templates.Count; i++)
+            {
+                Templates[i].Priority = i + 1;
+            }
+            OnPropertyChanged(nameof(ActiveTemplates));
+        }
+
+        public void AddNew()
+        {
+            var t = new StatusTemplate
+            {
+                Name = "New template",
+                DetailsFormat = "{game} — {sessionTime}",
+                StateFormat = "{platform} · {genre}",
+                IsEnabled = true,
+                Priority = Templates.Count + 1
+            };
+            Templates.Add(t);
+            SelectedTemplate = t;
+            OnPropertyChanged(nameof(ActiveTemplates));
+        }
+
+        public void DuplicateSelected()
+        {
+            if (SelectedTemplate == null) return;
+            var src = SelectedTemplate;
+            var idx = Templates.IndexOf(src);
+            if (idx < 0) return;
+
+            var copy = new StatusTemplate
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = src.Name + " (copy)",
+                Description = src.Description,
+                DetailsFormat = src.DetailsFormat,
+                StateFormat = src.StateFormat,
+                IsEnabled = src.IsEnabled,
+                Priority = src.Priority
+            };
+
+            Templates.Insert(Math.Min(idx + 1, Templates.Count), copy);
+            RecalculatePriorities();
+            SelectedTemplate = copy;
+        }
+
+        public void RemoveSelected()
+        {
+            if (SelectedTemplate == null) return;
+            var idx = Templates.IndexOf(SelectedTemplate);
+            if (idx < 0) return;
+
+            Templates.RemoveAt(idx);
+            RecalculatePriorities();
+            SelectedTemplate = Templates.Count > 0 ? Templates[Math.Min(idx, Templates.Count - 1)] : null;
+        }
+
+        public void MoveSelectedUp()
+        {
+            if (SelectedTemplate == null) return;
+            var idx = Templates.IndexOf(SelectedTemplate);
+            if (idx <= 0) return;
+
+            Templates.Move(idx, idx - 1);
+            RecalculatePriorities();
+        }
+
+        public void MoveSelectedDown()
+        {
+            if (SelectedTemplate == null) return;
+            var idx = Templates.IndexOf(SelectedTemplate);
+            if (idx < 0 || idx >= Templates.Count - 1) return;
+
+            Templates.Move(idx, idx + 1);
+            RecalculatePriorities();
         }
 
         public bool Save(out string error)
@@ -41,9 +127,8 @@ namespace DiscordRichPresencePlugin.UI
             error = null;
             try
             {
-                // replace all with current in-memory list
-                templateService.ReplaceAllTemplates(Templates.ToList());
-                logger.Debug("TemplateManagerViewModel: templates saved");
+                // Persist the current in-memory list
+                templateService.ReplaceAllTemplates(Templates);
                 return true;
             }
             catch (Exception ex)
@@ -94,16 +179,15 @@ namespace DiscordRichPresencePlugin.UI
                 return false;
             }
         }
-        private void GenerateTemplate()
+
+        // Stub for future generator
+        public void GenerateTemplateStub()
         {
-            // TODO: implement smart generator (ML/heuristics) later.
-            // For now just inform user; you can also prefill a basic template here.
-            var api = API.Instance;
-            if (api != null)
+            AddNew();
+            if (SelectedTemplate != null)
             {
-                api.Dialogs.ShowMessage(
-                    "Template generator is coming soon. This button is a stub for now.",
-                    "Template Manager");
+                SelectedTemplate.Name = "Suggested template";
+                SelectedTemplate.Description = "Auto-generated (stub)";
             }
         }
     }

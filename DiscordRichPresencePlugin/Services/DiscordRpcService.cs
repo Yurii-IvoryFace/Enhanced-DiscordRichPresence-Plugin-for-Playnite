@@ -160,19 +160,20 @@ namespace DiscordRichPresencePlugin.Services
 
         private string FormatGameDetails()
         {
-            if (currentGame == null)
-                return string.Empty;
+            if (currentGame == null) return string.Empty;
 
-            // Template-based Details
             if (settings.UseTemplates && templateService != null)
             {
                 var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
-                var formatted = templateService.FormatTemplateString(t?.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
-                if (!string.IsNullOrWhiteSpace(formatted))
-                    return formatted;
+                if (t != null)
+                {
+                    var formatted = templateService.FormatTemplateString(
+                        t.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
+                    if (!string.IsNullOrWhiteSpace(formatted))
+                        return formatted;
+                }
             }
 
-            // Fallback to simple custom format
             var template = string.IsNullOrEmpty(settings.CustomStatus)
                 ? Constants.DEFAULT_STATUS_FORMAT
                 : settings.CustomStatus;
@@ -182,16 +183,18 @@ namespace DiscordRichPresencePlugin.Services
 
         private string FormatGameState()
         {
-            if (currentGame == null)
-                return string.Empty;
+            if (currentGame == null) return string.Empty;
 
-            // Template-based State
             if (settings.UseTemplates && templateService != null)
             {
                 var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
-                var formatted = templateService.FormatTemplateString(t?.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
-                if (!string.IsNullOrWhiteSpace(formatted))
-                    return formatted;
+                if (t != null)
+                {
+                    var formatted = templateService.FormatTemplateString(
+                        t.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
+                    if (!string.IsNullOrWhiteSpace(formatted))
+                        return formatted;
+                }
             }
 
             // Legacy/manual construction with optional extras

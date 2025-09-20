@@ -108,6 +108,12 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="6,10,6,12">
                         <TextBlock Text="What to show in Rich Presence" Style="{StaticResource SectionHeader}"/>
+                        <UniformGrid Columns="2" Rows="2">
+                            <CheckBox Content="Enable Rich Presence"
+            IsChecked="{Binding EnableRichPresence}" Margin="0,0,0,8"/>
+                            <CheckBox Content="Use templates for Rich Presence"
+            IsChecked="{Binding UseTemplates}" Margin="0,0,0,8"/>
+                        </UniformGrid>
                         <UniformGrid Columns="2" Rows="3">
                             <CheckBox Content="Show total playtime"      IsChecked="{Binding ShowPlaytime}"/>
                             <CheckBox Content="Show completion estimate" IsChecked="{Binding ShowCompletionPercentage}"/>
@@ -157,9 +163,9 @@
                 <StackPanel Margin="6,10,6,12">
                     <TextBlock Text="Status templates" Style="{StaticResource SectionHeader}"/>
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="Open Template Manager" Click="OpenTemplateManager_Click"/>
-                        <Button Content="Export templates"      Click="ExportTemplates_Click"/>
-                        <Button Content="Import templates"      Click="ImportTemplates_Click"/>
+                        <Button Margin="0,0,6,0" Content="Open Template Manager" Click="OpenTemplateManager_Click"/>
+                        <Button Margin="0,0,6,0" Content="Export templates"      Click="ExportTemplates_Click"/>
+                        <Button Margin="0,0,6,0" Content="Import templates"      Click="ImportTemplates_Click"/>
                     </StackPanel>
                     <TextBlock Margin="0,8,0,0" Foreground="#666"
                      Text="Use the Template Manager to define prioritized templates with conditions (genres, platforms, time-of-day, days of week, etc.)."/>
@@ -171,8 +177,8 @@
                 <StackPanel Margin="6,10,6,12">
                     <TextBlock Text="Game art assets" Style="{StaticResource SectionHeader}"/>
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="Open assets folder"               Click="OpenAssetsFolder_Click"/>
-                        <Button Content="Open plugin data folder"          Click="OpenMappingsFolder_Click"/>
+                        <Button Margin="0,0,6,0" Content="Open assets folder"               Click="OpenAssetsFolder_Click"/>
+                        <Button Margin="0,0,6,0" Content="Open plugin data folder"          Click="OpenMappingsFolder_Click"/>
                     </StackPanel>
                     <TextBlock Margin="0,8,0,0" Foreground="#666"
                      Text="Asset keys map to game images for Rich Presence. Generated images are resized to 512–1024px and compressed under 256KB."/>
