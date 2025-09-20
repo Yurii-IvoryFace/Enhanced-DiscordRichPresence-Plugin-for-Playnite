@@ -38,6 +38,10 @@ namespace DiscordRichPresencePlugin.Services
             templatesFilePath = Path.Combine(pluginUserDataPath, "status_templates.json");
             LoadTemplates();
         }
+        public IReadOnlyList<StatusTemplate> GetAllTemplates()
+        {
+            lock (lockObject) return templates.OrderBy(t => t.Priority).ToList();
+        }
 
         /// <summary>
         /// Replace all templates with provided list and persist.
@@ -45,9 +49,23 @@ namespace DiscordRichPresencePlugin.Services
         public void ReplaceAllTemplates(IEnumerable<StatusTemplate> newTemplates)
         {
             if (newTemplates == null) return;
+
             lock (lockObject)
             {
-                templates = newTemplates.ToList();
+                var list = newTemplates.ToList();
+
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var t in list)
+                {
+                    if (string.IsNullOrWhiteSpace(t.Id) || !seen.Add(t.Id))
+                    {
+                        t.Id = Guid.NewGuid().ToString();
+                        seen.Add(t.Id);
+                    }
+                }
+
+                templates = list;
+                NormalizePriorities(templates);
                 SaveTemplates();
             }
         }
@@ -59,14 +77,9 @@ namespace DiscordRichPresencePlugin.Services
         {
             try
             {
-                List<StatusTemplate> snapshot;
-                lock (lockObject)
-                {
-                    snapshot = templates.ToList();
-                }
-                var json = Playnite.SDK.Data.Serialization.ToJson(snapshot, true);
+                var json = Serialization.ToJson(GetAllTemplates(), true);
                 File.WriteAllText(exportPath, json);
-                logger?.Info($"Exported {snapshot.Count} templates to: {exportPath}");
+                logger?.Info($"Exported templates to: {exportPath}");
                 return true;
             }
             catch (Exception ex)
@@ -85,7 +98,7 @@ namespace DiscordRichPresencePlugin.Services
             {
                 if (!File.Exists(importPath)) return false;
                 var json = File.ReadAllText(importPath);
-                var incoming = Playnite.SDK.Data.Serialization.FromJson<List<StatusTemplate>>(json) ?? new List<StatusTemplate>();
+                var incoming = Serialization.FromJson<List<StatusTemplate>>(json) ?? new List<StatusTemplate>();
 
                 lock (lockObject)
                 {
@@ -95,34 +108,36 @@ namespace DiscordRichPresencePlugin.Services
                     }
                     else
                     {
-                        // merge by Id, fallback by Name
+                        var byId = templates.ToDictionary(t => t.Id, StringComparer.OrdinalIgnoreCase);
                         foreach (var t in incoming)
                         {
-                            var existing = templates.FirstOrDefault(x => x.Id == t.Id)
-                                           ?? templates.FirstOrDefault(x => !string.IsNullOrEmpty(x.Name) &&
-                                                                            string.Equals(x.Name, t.Name, StringComparison.OrdinalIgnoreCase));
-                            if (existing == null)
+                            if (!string.IsNullOrEmpty(t.Id) && byId.ContainsKey(t.Id))
                             {
-                                templates.Add(t);
+                                var dst = byId[t.Id];
+                                CopyInto(dst, t);
                             }
                             else
                             {
-                                // update fields
-                                existing.Name = t.Name;
-                                existing.Description = t.Description;
-                                existing.DetailsFormat = t.DetailsFormat;
-                                existing.StateFormat = t.StateFormat;
-                                existing.Priority = t.Priority;
-                                existing.IsEnabled = t.IsEnabled;
-                                existing.Conditions = t.Conditions ?? existing.Conditions;
+                                var sameName = templates.FirstOrDefault(x =>
+                                    !string.IsNullOrEmpty(x.Name) &&
+                                    x.Name.Equals(t.Name, StringComparison.OrdinalIgnoreCase));
+
+                                if (sameName != null)
+                                {
+                                    CopyInto(sameName, t);
+                                }
+                                else
+                                {
+                                    templates.Add(t);
+                                }
                             }
                         }
                     }
 
+                    NormalizePriorities(templates);
                     SaveTemplates();
                 }
 
-                logger?.Info($"Imported {incoming.Count} templates from: {importPath}");
                 return true;
             }
             catch (Exception ex)
@@ -132,184 +147,42 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-
+        private static void CopyInto(StatusTemplate dst, StatusTemplate src)
+        {
+            dst.Name = src.Name;
+            dst.Description = src.Description;
+            dst.DetailsFormat = src.DetailsFormat;
+            dst.StateFormat = src.StateFormat;
+            dst.IsEnabled = src.IsEnabled;
+            dst.Priority = src.Priority;
+            dst.Conditions = src.Conditions;
+        }
 
         /// <summary>
         /// Loads templates from file or creates defaults
         /// </summary>
         private void LoadTemplates()
         {
-            lock (lockObject)
+            try
             {
-                if (File.Exists(templatesFilePath))
+                if (!File.Exists(templatesFilePath))
                 {
-                    try
-                    {
-                        var json = File.ReadAllText(templatesFilePath);
-                        templates = Serialization.FromJson<List<StatusTemplate>>(json) ?? new List<StatusTemplate>();
-                        logger?.Debug($"Loaded {templates.Count} templates");
-                    }
-                    catch (Exception ex)
-                    {
-                        logger?.Error($"Failed to load templates: {ex.Message}");
-                        CreateDefaultTemplates();
-                    }
+                    templates = new List<StatusTemplate>();
+                    SaveTemplates();
+                    return;
                 }
-                else
-                {
-                    CreateDefaultTemplates();
-                }
+
+                var json = File.ReadAllText(templatesFilePath);
+                var list = Serialization.FromJson<List<StatusTemplate>>(json) ?? new List<StatusTemplate>();
+                NormalizePriorities(list);
+                lock (lockObject) templates = list;
+                logger?.Debug($"Loaded {templates.Count} templates");
             }
-        }
-
-        /// <summary>
-        /// Creates default built-in templates
-        /// </summary>
-        private void CreateDefaultTemplates()
-        {
-            templates = new List<StatusTemplate>
+            catch (Exception ex)
             {
-                // Just Started template
-                new StatusTemplate
-                {
-                    Name = "Just Started",
-                    Description = "Shows when just starting a game",
-                    DetailsFormat = "Just started {game}",
-                    StateFormat = "Getting ready | {platform}",
-                    Priority = 1,
-                    Conditions = new TemplateConditions
-                    {
-                        MaxSessionTimeMinutes = 5
-                    }
-                },
-
-                // Short Session template
-                new StatusTemplate
-                {
-                    Name = "Short Session",
-                    Description = "For brief gaming sessions",
-                    DetailsFormat = "Playing {game}",
-                    StateFormat = "{genre} | Quick session",
-                    Priority = 2,
-                    Conditions = new TemplateConditions
-                    {
-                        MinSessionTimeMinutes = 5,
-                        MaxSessionTimeMinutes = 30
-                    }
-                },
-
-                // Long Session template
-                new StatusTemplate
-                {
-                    Name = "Long Session",
-                    Description = "For extended play sessions",
-                    DetailsFormat = "{phrase} {game}",
-                    StateFormat = "{sessionTime} | {completion}% complete",
-                    Priority = 2,
-                    Conditions = new TemplateConditions
-                    {
-                        MinSessionTimeMinutes = 30,
-                        MaxSessionTimeMinutes = 180
-                    }
-                },
-
-                // Marathon template
-                new StatusTemplate
-                {
-                    Name = "Marathon",
-                    Description = "For very long sessions",
-                    DetailsFormat = "Marathon session: {game}",
-                    StateFormat = "Playing for {sessionTime} | {mood}",
-                    Priority = 1,
-                    Conditions = new TemplateConditions
-                    {
-                        MinSessionTimeMinutes = 180
-                    }
-                },
-
-                // Achievement Hunter template
-                new StatusTemplate
-                {
-                    Name = "Achievement Hunter",
-                    Description = "Focus on achievements",
-                    DetailsFormat = "Hunting achievements in {game}",
-                    StateFormat = "{achievements} | {completion}% complete",
-                    Priority = 3,
-                    Conditions = new TemplateConditions
-                    {
-                        CompletionPercentage = new CompletionRange { Min = 50, Max = 99 }
-                    }
-                },
-
-                // Completionist template
-                new StatusTemplate
-                {
-                    Name = "Completionist",
-                    Description = "Near or at 100% completion",
-                    DetailsFormat = "Completing {game}",
-                    StateFormat = "🏆 {completion}% | {totalPlaytime}",
-                    Priority = 1,
-                    Conditions = new TemplateConditions
-                    {
-                        CompletionPercentage = new CompletionRange { Min = 90, Max = 100 }
-                    }
-                },
-
-                // Multiplayer template
-                new StatusTemplate
-                {
-                    Name = "Multiplayer",
-                    Description = "For multiplayer games",
-                    DetailsFormat = "{multiplayerStatus} {game}",
-                    StateFormat = "Online | {platform}",
-                    Priority = 2,
-                    Conditions = new TemplateConditions
-                    {
-                        HasMultiplayer = true
-                    }
-                },
-
-                // Co-op template
-                new StatusTemplate
-                {
-                    Name = "Co-op",
-                    Description = "For cooperative games",
-                    DetailsFormat = "Co-op: {game}",
-                    StateFormat = "{coopIndicator} | {sessionTime}",
-                    Priority = 2,
-                    Conditions = new TemplateConditions
-                    {
-                        HasCoop = true
-                    }
-                },
-
-                // Night Gaming template
-                new StatusTemplate
-                {
-                    Name = "Night Owl",
-                    Description = "Late night gaming",
-                    DetailsFormat = "Late night {game}",
-                    StateFormat = "🌙 {timeOfDay} gaming",
-                    Priority = 3,
-                    Conditions = new TemplateConditions
-                    {
-                        TimeOfDay = new TimeOfDayCondition { StartHour = 22, EndHour = 4 }
-                    }
-                },
-
-                // Weekend template
-                new StatusTemplate
-                {
-                    Name = "Weekend Warrior",
-                    Description = "Weekend gaming sessions",
-                    DetailsFormat = "Weekend gaming: {game}",
-                    StateFormat = "{dayOfWeek} | {sessionTime}",
-                    Priority = 4,
-                    Conditions = new TemplateConditions()
-                }
-            };
-
-            SaveTemplates();
+                logger?.Error($"Failed to load templates: {ex.Message}");
+                lock (lockObject) templates = new List<StatusTemplate>();
+            }
         }
 
         /// <summary>
@@ -317,31 +190,53 @@ namespace DiscordRichPresencePlugin.Services
         /// </summary>
         public StatusTemplate SelectTemplate(Game game, ExtendedGameInfo extendedInfo, DateTime sessionStart)
         {
-            if (game == null) return GetDefaultTemplate();
+            if (game == null)
+                return null; 
 
+            List<StatusTemplate> enabled;
             lock (lockObject)
             {
-                var enabledTemplates = templates.Where(t => t.IsEnabled).ToList();
-                var matchingTemplates = new List<StatusTemplate>();
-
-                foreach (var template in enabledTemplates)
+                logger?.Debug($"[Templates] Total templates: {templates.Count}");
+                logger?.Debug($"[Templates] Enabled templates: {templates.Count(t => t.IsEnabled)}");
+                if (templates.Any())
                 {
-                    if (MatchesConditions(template.Conditions, game, extendedInfo, sessionStart))
+                    foreach (var t in templates.Take(3))
                     {
-                        matchingTemplates.Add(template);
+                        logger?.Debug($"  - {t.Name}: Enabled={t.IsEnabled}, Priority={t.Priority}");
                     }
                 }
 
-                if (matchingTemplates.Any())
-                {
-                    return matchingTemplates
-                        .OrderByDescending(t => t.Priority)
-                        .ThenByDescending(t => GetSpecificityScore(t.Conditions))
-                        .First();
-                }
-
-                return GetDefaultTemplate();
+                enabled = templates.Where(t => t.IsEnabled).ToList();
             }
+            logger?.Debug($"[Templates] Game: {game.Name}, Genres: {string.Join(", ", game.Genres?.Select(g => g.Name) ?? new[] { "none" })}");
+            if (enabled.Count == 0)
+                return null;
+
+            var candidates = enabled
+                .Where(t => MatchesConditions(t.Conditions, game, extendedInfo, sessionStart))
+                .ToList();
+
+            if (candidates.Count == 0)
+                return null;
+
+            // Найбільш специфічний → далі пріоритет зростання (де 1 — найвищий)
+            return candidates
+                .OrderByDescending(t => GetSpecificityScore(t.Conditions))
+                .ThenBy(t => t.Priority)
+                .First();
+        }
+
+
+
+        private static int GetSpecificityScore(TemplateConditions c)
+        {
+            if (c == null) return 0;
+            int score = 0;
+            if (c.Platforms != null && c.Platforms.Any()) score += 2;
+            if (c.Genres != null && c.Genres.Any()) score += 2;
+            if (c.DaysOfWeek != null && c.DaysOfWeek.Any()) score += 1;
+            if (c.TimeOfDay != null && (c.TimeOfDay.StartHour.HasValue || c.TimeOfDay.EndHour.HasValue)) score += 1;
+            return score;
         }
 
         private static int GetSpecificityScore(TemplateConditions c)
@@ -364,79 +259,43 @@ namespace DiscordRichPresencePlugin.Services
         /// <summary>
         /// Checks if conditions match current game state
         /// </summary>
-        private bool MatchesConditions(TemplateConditions conditions, Game game, ExtendedGameInfo info, DateTime sessionStart)
+        private static bool MatchesConditions(TemplateConditions c, Game game, ExtendedGameInfo ex, DateTime sessionStart)
         {
-            if (conditions == null) return true;
+            if (c == null) return true;
 
-            var sessionMinutes = (int)(DateTime.UtcNow - sessionStart).TotalMinutes;
+            bool platOk = true, genreOk = true, hoursOk = true, daysOk = true;
 
-            // session time
-            if (conditions.MinSessionTimeMinutes.HasValue && sessionMinutes < conditions.MinSessionTimeMinutes) return false;
-            if (conditions.MaxSessionTimeMinutes.HasValue && sessionMinutes > conditions.MaxSessionTimeMinutes) return false;
-
-            // total playtime (seconds → minutes)
-            var totalMinutes = (int)((game?.Playtime ?? 0) / 60);
-            if (conditions.MinPlaytimeMinutes.HasValue && totalMinutes < conditions.MinPlaytimeMinutes.Value) return false;
-            if (conditions.MaxPlaytimeMinutes.HasValue && totalMinutes > conditions.MaxPlaytimeMinutes.Value) return false;
-
-            // completion
-            if (conditions.CompletionPercentage != null && info != null)
+            // Platforms
+            if (c.Platforms != null && c.Platforms.Count > 0)
             {
-                if (info.CompletionPercentage < conditions.CompletionPercentage.Min ||
-                    info.CompletionPercentage > conditions.CompletionPercentage.Max)
-                    return false;
+                platOk = (game?.Platforms?.Any(p => c.Platforms.Contains(p.Name, StringComparer.OrdinalIgnoreCase)) == true);
+            }
+            // Genres
+            if (c.Genres != null && c.Genres.Count > 0)
+            {
+                genreOk = (game?.Genres?.Any(g => c.Genres.Contains(g.Name, StringComparer.OrdinalIgnoreCase)) == true);
             }
 
-            // time of day
-            if (conditions.TimeOfDay?.StartHour != null)
+            // Time of day (22-2)
+            if (c.TimeOfDay != null && (c.TimeOfDay.StartHour.HasValue || c.TimeOfDay.EndHour.HasValue))
             {
-                var currentHour = DateTime.Now.Hour;
-                var start = conditions.TimeOfDay.StartHour.Value;
-                var end = conditions.TimeOfDay.EndHour ?? start;
-
-                bool inRange = start <= end
-                    ? (currentHour >= start && currentHour <= end)
-                    : (currentHour >= start || currentHour <= end);
-
-                if (!inRange) return false;
+                var hour = DateTime.Now.Hour; 
+                int a = Clamp(c.TimeOfDay.StartHour ?? 0, 0, 23);
+                int b = Clamp(c.TimeOfDay.EndHour ?? 23, 0, 23);
+                hoursOk = (a <= b) ? (hour >= a && hour <= b) : (hour >= a || hour <= b);
             }
 
-            // genres
-            if (conditions.Genres?.Any() == true)
+            // Days of week
+            if (c.DaysOfWeek != null && c.DaysOfWeek.Count > 0)
             {
-                if (game.Genres?.Any() == true)
-                {
-                    if (!game.Genres.Any(g => conditions.Genres.Contains(g.Name, StringComparer.OrdinalIgnoreCase)))
-                        return false;
-                }
-                else return false;
+                daysOk = c.DaysOfWeek.Contains(DateTime.Now.DayOfWeek);
             }
 
-            // platforms
-            if (conditions.Platforms?.Any() == true)
-            {
-                if (game.Platforms?.Any() == true)
-                {
-                    if (!game.Platforms.Any(p => conditions.Platforms.Contains(p.Name, StringComparer.OrdinalIgnoreCase)))
-                        return false;
-                }
-                else return false;
-            }
-
-            // multiplayer/coop
-            if (conditions.HasMultiplayer.HasValue && info != null)
-            {
-                if (conditions.HasMultiplayer.Value != info.SupportsMultiplayer)
-                    return false;
-            }
-            if (conditions.HasCoop.HasValue && info != null)
-            {
-                if (conditions.HasCoop.Value != info.SupportsCoop)
-                    return false;
-            }
-
-            return true;
+            return platOk && genreOk && hoursOk && daysOk;
         }
+
+        private static int Clamp(int v, int min, int max) => v < min ? min : (v > max ? max : v);
+    
 
         /// <summary>
         /// Formats template string with actual values
@@ -449,7 +308,7 @@ namespace DiscordRichPresencePlugin.Services
 
             // Basic game info
             result = result.Replace(TemplateVariables.GameName, game?.Name ?? "Unknown");
-            result = result.Replace(TemplateVariables.Platform, game?.Platforms?.FirstOrDefault()?.Name ?? "PC");
+            //result = result.Replace(TemplateVariables.Platform, game?.Platforms?.FirstOrDefault()?.Name ?? "PC");
             result = result.Replace(TemplateVariables.Source, game?.Source?.Name ?? "");
             result = result.Replace(TemplateVariables.Genre, game?.Genres?.FirstOrDefault()?.Name ?? "");
 
@@ -515,8 +374,8 @@ namespace DiscordRichPresencePlugin.Services
         private string FormatPlaytimeFromSeconds(long seconds)
         {
             if (seconds <= 0) return "0m";
-           var hours = seconds / 3600;
-           var minutes = (seconds % 3600) / 60;
+            var hours = seconds / 3600;
+            var minutes = (seconds % 3600) / 60;
             return hours > 0 ? $"{hours}h {minutes}m" : $"{minutes}m";
         }
 
@@ -529,14 +388,33 @@ namespace DiscordRichPresencePlugin.Services
             return "Night";
         }
 
-        private StatusTemplate GetDefaultTemplate()
+        public void ApplyEnabledSet(IEnumerable<string> enabledIds, bool persist = false)
         {
-            return new StatusTemplate
+            if (enabledIds == null || !enabledIds.Any())
             {
-                Name = "Default",
-                DetailsFormat = "Playing {game}",
-                StateFormat = "{platform} | {genre}"
-            };
+                logger?.Debug("[Templates] EnabledIds is empty, keeping templates as-is");
+                return;
+            }
+
+            var set = new HashSet<string>(enabledIds.Where(id => !string.IsNullOrWhiteSpace(id)),
+                                          StringComparer.OrdinalIgnoreCase);
+
+            lock (lockObject)
+            {
+                foreach (var t in templates)
+                {
+                    if (string.IsNullOrWhiteSpace(t.Id))
+                    {
+                        t.Id = Guid.NewGuid().ToString();
+                    }
+                    t.IsEnabled = set.Contains(t.Id);
+                }
+
+                if (persist)
+                {
+                    SaveTemplates();
+                }
+            }
         }
 
         /// <summary>
@@ -566,28 +444,27 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-        /// <summary>
-        /// Gets all templates
-        /// </summary>
-        public List<StatusTemplate> GetAllTemplates()
-        {
-            lock (lockObject)
-            {
-                return templates.ToList();
-            }
-        }
 
         private void SaveTemplates()
         {
             try
             {
-                var json = Serialization.ToJson(templates, true);
+                var json = Serialization.ToJson(templates.OrderBy(t => t.Priority).ToList(), true);
                 File.WriteAllText(templatesFilePath, json);
                 logger?.Debug("Templates saved successfully");
             }
             catch (Exception ex)
             {
                 logger?.Error($"Failed to save templates: {ex.Message}");
+            }
+        }
+
+        private static void NormalizePriorities(List<StatusTemplate> list)
+        {
+            int p = 1;
+            foreach (var t in list.OrderBy(x => x.Priority))
+            {
+                t.Priority = p++;
             }
         }
     }

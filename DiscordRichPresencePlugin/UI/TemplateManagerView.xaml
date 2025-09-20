@@ -1,42 +1,285 @@
-﻿<UserControl x:Class="DiscordRichPresencePlugin.Views.TemplateManagerView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d">
-	<Grid Margin="12">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="*"/>
-			<RowDefinition Height="Auto"/>
-		</Grid.RowDefinitions>
+﻿<UserControl
+    x:Class="DiscordRichPresencePlugin.UI.TemplateManagerView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d" d:DesignHeight="600"
+    UseLayoutRounding="True" SnapsToDevicePixels="True" Width="1207">
 
-		<TextBlock Text="Шаблони Rich Presence" FontWeight="Bold" FontSize="14"/>
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="PrimaryTextBrush"
+                   Color="{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"
+                   Opacity="0.95"/>
+        <SolidColorBrush x:Key="PanelTintBrush"
+                   Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"
+                   Opacity="0.08"/>
+        <SolidColorBrush x:Key="PanelBorderBrush"
+                   Color="{DynamicResource {x:Static SystemColors.ControlDarkColorKey}}"
+                   Opacity="0.35"/>
+        <SolidColorBrush x:Key="AltRowBrush"
+                   Color="{DynamicResource {x:Static SystemColors.ControlLightColorKey}}"
+                   Opacity="0.10"/>
+        <SolidColorBrush x:Key="ActiveRowBrush"
+                   Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"
+                   Opacity="0.18"/>
+        <SolidColorBrush x:Key="HeaderForegroundBrush"
+                   Color="{DynamicResource {x:Static SystemColors.HighlightTextColorKey}}"
+                   Opacity="0.95"/>
+        <SolidColorBrush x:Key="SelectedRowBrush"
+                 Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"
+                 Opacity="1"/>
 
-		<DataGrid Grid.Row="1" Margin="0,8,0,8"
-                  ItemsSource="{Binding Templates}"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False"
-                  CanUserDeleteRows="False"
-                  IsReadOnly="False">
-			<DataGrid.Columns>
-				<DataGridTextColumn Header="Id" Binding="{Binding Id}" Width="2*" IsReadOnly="True"/>
-				<DataGridTextColumn Header="Назва" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="2*"/>
-				<DataGridTextColumn Header="Опис" Binding="{Binding Description, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="4*"/>
-				<DataGridCheckBoxColumn Header="Увімкн."
-                                        Binding="{Binding IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                        Width="*"/>
-				<DataGridTextColumn Header="Пріор."
-                                    Binding="{Binding Priority, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="*"/>
-			</DataGrid.Columns>
-		</DataGrid>
+        <SolidColorBrush x:Key="SelectedRowUnfocusedBrush"
+                 Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}"
+                 Opacity="0.35"/>
+        
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource HeaderForegroundBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
 
-		<StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-			<Button x:Name="BtnRefresh" Content="Оновити" Margin="0,0,8,0" Click="BtnRefresh_Click"/>
-			<Button x:Name="BtnExport" Content="Експорт…" Margin="0,0,8,0" Click="BtnExport_Click"/>
-			<Button x:Name="BtnImport" Content="Імпорт…" Margin="0,0,8,0" Click="BtnImport_Click"/>
-			<Button x:Name="BtnSave" Content="Зберегти" IsDefault="True" Click="BtnSave_Click"/>
-		</StackPanel>
-	</Grid>
+        <Style x:Key="PlayniteButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlLightBrushKey}}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,6" />
+            <Setter Property="Margin" Value="6,5,0,5"/>
+            <Setter Property="MinWidth" Value="80"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" Opacity="0.12"/>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background">
+                        <Setter.Value>
+                            <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.HighlightColorKey}}" Opacity="0.22"/>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.5"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="GridHeaderStyle" TargetType="{x:Type DataGridColumnHeader}">
+            <Setter Property="Foreground" Value="{StaticResource HeaderForegroundBrush}"/>
+            <Setter Property="Background" Value="{StaticResource PanelTintBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Height" Value="28"/>
+        </Style>
+
+        <!--  DataGrid -->
+        <Style x:Key="TemplateRowStyle" TargetType="{x:Type DataGridRow}">
+            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource SelectedRowBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                </Trigger>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsSelected" Value="True"/>
+                        <Condition Property="IsKeyboardFocusWithin" Value="False"/>
+                    </MultiTrigger.Conditions>
+                    <Setter Property="Background" Value="{StaticResource SelectedRowUnfocusedBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                </MultiTrigger>
+
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsEnabled}" Value="True"/>
+                        <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=IsSelected}" Value="False"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                    <Setter Property="Background" Value="{StaticResource ActiveRowBrush}"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="{x:Type DataGridCell}">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="6,6"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.HighlightTextBrushKey}}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SelectedTextBox" TargetType="TextBox">
+            <Setter Property="Foreground" Value="{StaticResource PrimaryTextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PanelBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="700*"/>
+            <ColumnDefinition Width="487*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0" Grid.ColumnSpan="2"
+        Background="{StaticResource PanelTintBrush}"
+        BorderBrush="{StaticResource PanelBorderBrush}"
+        BorderThickness="0,0,0,1"
+        CornerRadius="6" Padding="8" Margin="0,0,0,6">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <WrapPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button Content="Add"       Style="{StaticResource PlayniteButton}" Click="BtnAdd_Click"/>
+                    <Button Content="Duplicate" Style="{StaticResource PlayniteButton}" Click="BtnDuplicate_Click"/>
+                    <Button Content="Remove"    Style="{StaticResource PlayniteButton}" Click="BtnRemove_Click"/>
+
+
+
+                    <Button Content="Move up"   Style="{StaticResource PlayniteButton}" Click="BtnMoveUp_Click"/>
+                    <Button Content="Move down" Style="{StaticResource PlayniteButton}" Click="BtnMoveDown_Click"/>
+
+
+
+                    <Button Content="Generate Template (beta)" Style="{StaticResource PlayniteButton}"
+              Click="BtnGenerate_Click" ToolTip="Generate a suggested template (coming soon)"/>
+                </WrapPanel>
+
+                <WrapPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Refresh"  Style="{StaticResource PlayniteButton}" Click="BtnRefresh_Click"/>
+                    <Button Content="Import…"  Style="{StaticResource PlayniteButton}" Click="BtnImport_Click"/>
+                    <Button Content="Export…"  Style="{StaticResource PlayniteButton}" Click="BtnExport_Click"/>
+                    <Button Content="Save All" Style="{StaticResource PlayniteButton}" Click="BtnSave_Click"/>
+                    <Button Content="Close"    Style="{StaticResource PlayniteButton}" Click="BtnClose_Click"/>
+                </WrapPanel>
+            </Grid>
+        </Border>
+
+        <!-- LEFT: Templates grid (у панелі з м’яким тінтом) -->
+        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,8,0">
+            <TextBlock Text="Templates (top = priority 1)" Style="{StaticResource SectionHeader}"/>
+            <Border Background="{StaticResource PanelTintBrush}"
+              BorderBrush="{StaticResource PanelBorderBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="6">
+                <DataGrid x:Name="TemplatesGrid" ItemsSource="{Binding Templates}" SelectedItem="{Binding SelectedTemplate}"
+            AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
+            HeadersVisibility="Column" RowStyle="{StaticResource TemplateRowStyle}"
+            Background="Transparent" GridLinesVisibility="None" BorderThickness="0"
+            ColumnHeaderStyle="{StaticResource GridHeaderStyle}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Priority" Binding="{Binding Priority, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="60" IsReadOnly="True"/>
+                        <DataGridCheckBoxColumn Header="Active" Binding="{Binding IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="60"/>
+                        <DataGridTextColumn Header="Name" Binding="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                        <DataGridTextColumn Header="Details format" Binding="{Binding DetailsFormat, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="2*"/>
+                        <DataGridTextColumn Header="State format" Binding="{Binding StateFormat, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="2*"/>
+                        <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="240" IsReadOnly="True"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Border>
+        </StackPanel>
+
+        <!-- RIGHT: Active list + Selected template -->
+        <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="Active (by priority)" Style="{StaticResource SectionHeader}"/>
+
+                <Border Background="{StaticResource PanelTintBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="1" CornerRadius="6" Padding="6" Margin="0,0,0,8">
+                    <ListBox ItemsSource="{Binding ActiveTemplates}" BorderThickness="0" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontWeight="Bold" Text="{Binding Priority}" Width="28"
+                 Foreground="{StaticResource PrimaryTextBrush}"/>
+                                    <TextBlock Text=" - " Margin="2,0,2,0" Foreground="{StaticResource PrimaryTextBrush}"/>
+                                    <TextBlock Text="{Binding Name}" Foreground="{StaticResource PrimaryTextBrush}"/>
+                                    <TextBlock Text="  (" Foreground="#888" />
+                                    <TextBlock Text="{Binding Id}" Foreground="#888"/>
+                                    <TextBlock Text=")" Foreground="#888"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+
+                <TextBlock Text="Selected template" Style="{StaticResource SectionHeader}"/>
+
+                <Border Background="{StaticResource PanelTintBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="1" CornerRadius="6" Padding="8">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="110"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Name:" Foreground="{DynamicResource {x:Static SystemColors.ControlLightBrushKey}}"/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+         Style="{StaticResource SelectedTextBox}"
+         Text="{Binding SelectedTemplate.Name, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,6,0,0" Text="Details:" Foreground="{DynamicResource {x:Static SystemColors.ControlLightBrushKey}}"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Margin="0,6,0,0"
+         Style="{StaticResource SelectedTextBox}"
+         AcceptsReturn="True" Height="40"
+         Text="{Binding SelectedTemplate.DetailsFormat, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,6,0,0" Text="State:" Foreground="{DynamicResource {x:Static SystemColors.ControlLightBrushKey}}"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Margin="0,6,0,0"
+         Style="{StaticResource SelectedTextBox}"
+         AcceptsReturn="True" Height="40"
+         Text="{Binding SelectedTemplate.StateFormat, UpdateSourceTrigger=PropertyChanged}"/>
+                 
+                        <CheckBox  Grid.Row="8" Grid.Column="1" Margin="0,6,0,0" Content="Enabled" Foreground="{DynamicResource {x:Static SystemColors.ControlLightBrushKey}}"
+                       IsChecked="{Binding SelectedTemplate.IsEnabled}"/>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Footer tip -->
+        <DockPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,8,0,0">
+            <TextBlock VerticalAlignment="Center" Foreground="#888"
+                 Text="Tip: order defines priority (top = 1). Use Move up/down. Enabled items appear in the Active list."/>
+        </DockPanel>
+    </Grid>
 </UserControl>

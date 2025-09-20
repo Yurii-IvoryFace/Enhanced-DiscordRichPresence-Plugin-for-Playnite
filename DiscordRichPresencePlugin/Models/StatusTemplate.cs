@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace DiscordRichPresencePlugin.Models
@@ -45,6 +45,7 @@ namespace DiscordRichPresencePlugin.Models
         public CompletionRange CompletionPercentage { get; set; }
         public TimeOfDayCondition TimeOfDay { get; set; }
 
+        public List<DayOfWeek> DaysOfWeek { get; set; } = new List<DayOfWeek>();
         public bool? HasMultiplayer { get; set; }
         public bool? HasCoop { get; set; }
     }

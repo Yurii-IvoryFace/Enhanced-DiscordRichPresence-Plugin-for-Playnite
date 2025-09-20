@@ -24,30 +24,9 @@ namespace DiscordRichPresencePlugin.Services
             backupDirectory = Path.Combine(pluginUserDataPath, "backups");
             this.logger = logger;
 
-            EnsureDirectoriesExist();
+            EnsureMappingsStorage();
             LoadMappings();
             EnsureMappingsFileExists();
-        }
-
-        private void EnsureDirectoriesExist()
-        {
-            try
-            {
-                var dataDir = Path.GetDirectoryName(mappingsFilePath);
-                if (!Directory.Exists(dataDir))
-                {
-                    Directory.CreateDirectory(dataDir);
-                }
-
-                if (!Directory.Exists(backupDirectory))
-                {
-                    Directory.CreateDirectory(backupDirectory);
-                }
-            }
-            catch (Exception ex)
-            {
-                logger?.Error($"Failed to create directories: {ex.Message}");
-            }
         }
 
         private void LoadMappings()
@@ -108,21 +87,42 @@ namespace DiscordRichPresencePlugin.Services
 
         public string GetMappingsFilePath() => mappingsFilePath;
 
-        public void EnsureMappingsFileExists()
+        public bool EnsureMappingsStorage(bool createIfMissing = true)
+
         {
             lock (lockObject)
             {
                 try
                 {
+                    var dataDir = Path.GetDirectoryName(mappingsFilePath);
+                    if (string.IsNullOrWhiteSpace(dataDir))
+                    {
+                        throw new InvalidOperationException("Mappings file path has no directory.");
+                    }
+
+                    // Idempotent: CreateDirectory не падає, якщо папка вже існує
+                    Directory.CreateDirectory(dataDir);
+                    Directory.CreateDirectory(backupDirectory);
+
                     if (!File.Exists(mappingsFilePath))
                     {
+                        if (!createIfMissing)
+                        {
+                            // повертай false, якщо файл відсутній і ми не маємо його створювати
+                            return false;
+                        }
+
+                        // Створюємо порожній/дефолтний файл мапінгів
                         SaveMappings();
                         logger?.Info($"Created mappings file at: {mappingsFilePath}");
                     }
+
+                    return true;
                 }
                 catch (Exception ex)
                 {
-                    logger?.Error($"Failed to ensure mappings file exists: {ex.Message}");
+                    logger?.Error($"EnsureMappingsStorage failed: {ex.Message}");
+                    return false;
                 }
             }
         }
@@ -184,6 +184,7 @@ namespace DiscordRichPresencePlugin.Services
         public int GenerateMissingMappings(IEnumerable<Game> games)
         {
             if (games == null) return 0;
+            EnsureMappingsStorage();
 
             int added = 0;
             lock (lockObject)
@@ -496,7 +497,6 @@ namespace DiscordRichPresencePlugin.Services
             var slug = System.Text.RegularExpressions.Regex
                 .Replace((name ?? "").ToLowerInvariant(), "[^a-z0-9]+", "_")
                 .Trim('_');
-
             if (string.IsNullOrWhiteSpace(slug))
                 slug = "game";
 

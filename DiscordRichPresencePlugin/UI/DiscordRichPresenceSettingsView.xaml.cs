@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -6,62 +6,85 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Navigation;
+using Microsoft.Win32;
 using Playnite.SDK;
 using DiscordRichPresencePlugin.Services;
-using DiscordRichPresencePlugin.Views;
+using PluginNS = DiscordRichPresencePlugin;
+using EnumsNS = DiscordRichPresencePlugin.Enums;
 
-namespace DiscordRichPresencePlugin
+namespace DiscordRichPresencePlugin_UI
 {
     public partial class DiscordRichPresenceSettingsView : UserControl
     {
+        private readonly Action openTemplateManagerAction;
         private readonly ILogger logger = LogManager.GetLogger();
         private readonly IPlayniteAPI playniteApi;
         private readonly ImageManagerService imageManager;
+
+        public Array ButtonModes { get; } = Enum.GetValues(typeof(EnumsNS.ButtonDisplayMode));
+
         private static readonly Regex AppIdStrict = new Regex(@"^[0-9]{17,19}$");
         private static readonly Regex DigitsOnly = new Regex(@"^[0-9]+$");
 
-        public DiscordRichPresenceSettingsView()
+        public DiscordRichPresenceSettingsView(
+    PluginNS.DiscordRichPresenceSettings settings,
+    ImageManagerService imageManager,
+    Action openTemplateManagerAction)
         {
             InitializeComponent();
             playniteApi = API.Instance;
-            this.Loaded += OnLoadedAttachTemplateManager;
+            this.imageManager = imageManager;
+            this.openTemplateManagerAction = openTemplateManagerAction; // ← зберігаємо делегат
+            DataContext = settings;
         }
 
-        public DiscordRichPresenceSettingsView(ImageManagerService imageManager) : this()
-        {
-            this.imageManager = imageManager;
-        }
+        // обгортки НЕ створюються в рантаймі, але хай будуть для дизайнера
+        public DiscordRichPresenceSettingsView(PluginNS.DiscordRichPresenceSettings settings, ImageManagerService imageManager)
+            : this(settings, imageManager, null) { }
+
+        public DiscordRichPresenceSettingsView(PluginNS.DiscordRichPresenceSettings settings)
+            : this(settings, null, null) { }
+
+        public DiscordRichPresenceSettingsView()
+            : this(null, null, null) { }
+
+        // -------- App ID / інші дії --------
 
         private void Reconnect_Click(object sender, RoutedEventArgs e)
         {
-            var s = DataContext as DiscordRichPresenceSettings;
-            if (s == null) return;
+            var settings = this.DataContext as PluginNS.DiscordRichPresenceSettings;
+            if (settings == null) return;
 
-            var id = (s.DiscordAppId ?? string.Empty).Trim();
-            if (!AppIdStrict.IsMatch(id))
+            var id = (settings.DiscordAppId ?? string.Empty).Trim();
+            if (id.Length > 0 && !AppIdStrict.IsMatch(id))
             {
-                API.Instance?.Dialogs?.ShowErrorMessage(
-                    "Invalid App ID. It must be 17–19 digits.", "Discord Rich Presence");
+                API.Instance.Dialogs.ShowErrorMessage(
+                    "Invalid Discord Application ID. It must contain 17–19 digits.",
+                    "Discord Rich Presence");
                 return;
             }
 
-            s.RequestReconnect();
+            try { settings.RequestReconnect(); }
+            catch (Exception ex) { logger.Error("Reconnect failed: " + ex.Message); }
         }
 
-        private void CopyActiveId_Click(object sender, RoutedEventArgs e)
+        private void ResetAppId_Click(object sender, RoutedEventArgs e)
         {
-            if (DataContext is DiscordRichPresenceSettings s && !string.IsNullOrWhiteSpace(s.ActiveAppId))
-            {
-                Clipboard.SetText(s.ActiveAppId);
-            }
+            var settings = this.DataContext as PluginNS.DiscordRichPresenceSettings;
+            if (settings == null) return;
+
+            settings.DiscordAppId = PluginNS.Constants.DISCORD_APP_ID;
+            try { settings.RequestReconnect(); } catch { }
         }
 
-        private void AppIdBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        // -------- numeric input helpers --------
+
+        private void AppIdTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             e.Handled = !DigitsOnly.IsMatch(e.Text);
         }
 
-        private void AppIdBox_OnPaste(object sender, DataObjectPastingEventArgs e)
+        private void AppIdTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
         {
             if (!e.DataObject.GetDataPresent(DataFormats.UnicodeText))
             {
@@ -70,7 +93,8 @@ namespace DiscordRichPresencePlugin
             }
 
             var paste = (string)e.DataObject.GetData(DataFormats.UnicodeText);
-            var box = (TextBox)sender;
+            var box = sender as TextBox;
+            if (box == null) return;
 
             var proposed = box.Text.Remove(box.SelectionStart, box.SelectionLength)
                                    .Insert(box.SelectionStart, paste);
@@ -81,38 +105,53 @@ namespace DiscordRichPresencePlugin
             }
         }
 
-        private string GetPluginFolderPath()
+        private void DigitsOnly_PreviewTextInput(object sender, TextCompositionEventArgs e) => AppIdTextBox_PreviewTextInput(sender, e);
+        private void DigitsOnly_Pasting(object sender, DataObjectPastingEventArgs e) => AppIdTextBox_Pasting(sender, e);
+
+        // -------- папки / посилання --------
+
+        private string GetPluginUserDataPath()
         {
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Playnite",
-                "ExtensionsData",
-                "7ad84e05-6c01-4b13-9b12-86af81775396"
+                "Playnite", "ExtensionsData",
+                "7ad84e05-6c01-4b13-9b12-86af81775396" // якщо інший PluginId — заміни на свій
             );
         }
 
-        private void ButtonOpenMappingsFolder_Click(object sender, RoutedEventArgs e)
+        private void OpenAssetsFolder_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var pluginFolder = GetPluginFolderPath();
-                if (!Directory.Exists(pluginFolder))
+                if (imageManager != null)
                 {
-                    Directory.CreateDirectory(pluginFolder);
+                    imageManager.OpenAssetsFolder();
                 }
-                Process.Start(new ProcessStartInfo
+                else
                 {
-                    FileName = pluginFolder,
-                    UseShellExecute = true
-                });
+                    var path = Path.Combine(GetPluginUserDataPath(), "assets");
+                    if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+                    Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+                }
             }
             catch (Exception ex)
             {
-                logger.Error($"Failed to open mappings folder: {ex.Message}");
-                playniteApi?.Dialogs.ShowErrorMessage(
-                    "Не вдалося відкрити папку зі схемою. Перевірте журнали.",
-                    "Помилка"
-                );
+                logger.Error("Failed to open assets folder: " + ex.Message);
+                API.Instance.Dialogs.ShowErrorMessage("Failed to open assets folder. See logs for details.", "Discord Rich Presence");
+            }
+        }
+
+        private void OpenMappingsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var folder = GetPluginUserDataPath();
+                if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+                Process.Start(new ProcessStartInfo { FileName = folder, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                logger.Error("Failed to open plugin data folder: " + ex.Message);
             }
         }
 
@@ -120,113 +159,109 @@ namespace DiscordRichPresencePlugin
         {
             try
             {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = e.Uri.AbsoluteUri,
-                    UseShellExecute = true
-                });
+                Process.Start(new ProcessStartInfo { FileName = e.Uri.AbsoluteUri, UseShellExecute = true });
                 e.Handled = true;
             }
             catch (Exception ex)
             {
-                logger.Error($"Не вдалося відкрити URL-адресу: {ex.Message}");
-                playniteApi?.Dialogs.ShowErrorMessage(
-                    "Не вдалося відкрити URL-адресу. Перевірте журнали.",
-                    "Помилка"
-                );
+                logger.Error("Failed to open URL: " + ex.Message);
             }
         }
 
-        private void OnLoadedAttachTemplateManager(object sender, RoutedEventArgs e)
+        // -------- Templates: Open / Export / Import --------
+
+        private string GetTemplatesFilePath()
+        {
+            return Path.Combine(GetPluginUserDataPath(), "templates.json");
+        }
+
+        private void OpenTemplateManager_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var btn = FindChild<Button>(this, b => (b.Tag as string) == "templateManager");
-                if (btn != null)
+                logger.Info("SettingsView ctor: delegate is " + (openTemplateManagerAction == null ? "NULL" : "SET"));
+
+                if (openTemplateManagerAction != null)
                 {
-                    btn.Click -= TemplateManagerButton_Click;
-                    btn.Click += TemplateManagerButton_Click;
+                    openTemplateManagerAction.Invoke();
+                }
+                else
+                {
+                    API.Instance.Dialogs.ShowMessage(
+                        "Template Manager is not wired from the plugin. Please open it from the main menu.",
+                        "Discord Rich Presence");
                 }
             }
             catch (Exception ex)
             {
-                logger.Error($"Failed to wire Template Manager button: {ex.Message}");
+                logger.Error("OpenTemplateManager_Click failed: " + ex);
+                API.Instance.Dialogs.ShowErrorMessage(
+                    "Failed to open Template Manager. See logs for details.",
+                    "Discord Rich Presence");
             }
         }
 
-        private void TemplateManagerButton_Click(object sender, RoutedEventArgs e)
+        private void ExportTemplates_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var pluginFolder = GetPluginFolderPath();
-                var templateService = new TemplateService(pluginFolder, logger);
-
-                var view = new TemplateManagerView();
-                var vm = new TemplateManagerViewModel(templateService);
-                view.DataContext = vm;
-
-                var window = playniteApi.Dialogs.CreateWindow(new WindowCreationOptions
+                var src = GetTemplatesFilePath();
+                if (!File.Exists(src))
                 {
-                    ShowCloseButton = true,
-                    ShowMaximizeButton = true,
-                    ShowMinimizeButton = true
-                });
-
-                window.Title = "Менеджер шаблонів";
-                window.Width = 900;
-                window.Height = 600;
-                window.ResizeMode = ResizeMode.CanResize;
-                window.SizeToContent = SizeToContent.Manual;
-                window.Owner = Window.GetWindow(this);
-                window.Content = view;
-
-                window.ShowDialog();
-            }
-            catch (Exception ex)
-            {
-                logger.Error($"Failed to open Template Manager: {ex.Message}");
-                playniteApi?.Dialogs?.ShowErrorMessage(
-                    "Не вдалося відкрити менеджер шаблонів. Перевірте журнали.",
-                    "Помилка");
-            }
-        }
-
-        private void ButtonOpenAssets_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                if (imageManager != null)
-                {
-                    imageManager.OpenAssetsFolder();
+                    API.Instance.Dialogs.ShowErrorMessage("No templates file found to export (templates.json).", "Discord Rich Presence");
                     return;
                 }
 
-                var path = System.IO.Path.Combine(GetPluginFolderPath(), "assets");
-                if (!Directory.Exists(path)) Directory.CreateDirectory(path);
-                Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+                var sfd = new SaveFileDialog
+                {
+                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                    FileName = "status_templates.json",
+                    AddExtension = true,
+                    OverwritePrompt = true
+                };
+                if (sfd.ShowDialog() != true) return;
+
+                File.Copy(src, sfd.FileName, true);
+                API.Instance.Dialogs.ShowMessage("Templates exported:\n" + sfd.FileName, "Discord Rich Presence");
             }
             catch (Exception ex)
             {
-                logger.Error($"Failed to open assets folder: {ex.Message}");
-                playniteApi?.Dialogs?.ShowErrorMessage("Не вдалося відкрити теку assets. Перевірте журнали.", "Помилка");
+                logger.Error("ExportTemplates_Click failed: " + ex);
+                API.Instance.Dialogs.ShowErrorMessage("Failed to export templates. See logs for details.", "Discord Rich Presence");
             }
         }
 
-        private T FindChild<T>(DependencyObject parent, Func<T, bool> predicate) where T : DependencyObject
+        private void ImportTemplates_Click(object sender, RoutedEventArgs e)
         {
-            if (parent == null) return null;
-
-            var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < count; i++)
+            try
             {
-                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
-                if (child is T typed && (predicate?.Invoke(typed) ?? true))
-                    return typed;
+                var ofd = new OpenFileDialog
+                {
+                    Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                    Multiselect = false
+                };
+                if (ofd.ShowDialog() != true) return;
 
-                var nested = FindChild<T>(child, predicate);
-                if (nested != null) return nested;
+                var destDir = GetPluginUserDataPath();
+                if (!Directory.Exists(destDir)) Directory.CreateDirectory(destDir);
+
+                var dest = GetTemplatesFilePath();
+
+                // backup існуючого
+                if (File.Exists(dest))
+                {
+                    var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+                    File.Copy(dest, Path.Combine(destDir, $"templates.{stamp}.json.bak"), false);
+                }
+
+                File.Copy(ofd.FileName, dest, true);
+                API.Instance.Dialogs.ShowMessage("Templates imported:\n" + ofd.FileName, "Discord Rich Presence");
             }
-            return null;
+            catch (Exception ex)
+            {
+                logger.Error("ImportTemplates_Click failed: " + ex);
+                API.Instance.Dialogs.ShowErrorMessage("Failed to import templates. See logs for details.", "Discord Rich Presence");
+            }
         }
     }
 }

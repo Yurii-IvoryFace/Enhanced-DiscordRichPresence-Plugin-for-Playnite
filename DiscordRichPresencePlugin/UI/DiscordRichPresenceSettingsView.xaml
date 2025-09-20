@@ -1,142 +1,199 @@
-﻿<UserControl x:Class="DiscordRichPresencePlugin.DiscordRichPresenceSettingsView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:enums="clr-namespace:DiscordRichPresencePlugin.Enums"
-             mc:Ignorable="d">
+﻿<UserControl
+    x:Class="DiscordRichPresencePlugin_UI.DiscordRichPresenceSettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:sys="clr-namespace:System;assembly=mscorlib"
+    xmlns:enums="clr-namespace:DiscordRichPresencePlugin.Enums"
+    mc:Ignorable="d"
+    x:Name="Root"
+    d:DesignHeight="560" d:DesignWidth="820"
+    UseLayoutRounding="True" SnapsToDevicePixels="True">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="16" Orientation="Vertical" VerticalAlignment="Top" >
+    <UserControl.Resources>
+        <ObjectDataProvider x:Key="ButtonModesSrc"
+                    MethodName="GetValues"
+                    ObjectType="{x:Type sys:Enum}">
+        </ObjectDataProvider>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,6,0,0"/>
+        </Style>
+        <GridLength x:Key="LabelCol">170</GridLength>
+    </UserControl.Resources>
 
-            <!-- Загальні -->
-            <StackPanel Margin="0,8,0,0">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Discord App ID:" VerticalAlignment="Center" Width="130"/>
-                    <TextBox x:Name="AppIdBox"
-             Width="280"
-             Text="{Binding DiscordAppId, UpdateSourceTrigger=PropertyChanged}"
-             PreviewTextInput="AppIdBox_PreviewTextInput"
-             DataObject.Pasting="AppIdBox_OnPaste"
-             ToolTip="Digits only (17–19). The numeric Client ID from Discord Developer Portal." />
-                    <Button Content="Reconnect" Margin="8,0,0,0" Click="Reconnect_Click"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="130,2,0,0">
-                    <TextBlock Text="{Binding ActiveAppId, StringFormat=Active App ID: {0}}" VerticalAlignment="Center" Foreground="Gray"/>
-                    <Button Content="Copy" Margin="8,0,0,0" Padding="6,0"
-          Click="CopyActiveId_Click"/>
-                </StackPanel>
+    <Grid Margin="10">
+        <TabControl>
+            <!-- GENERAL -->
+            <TabItem Header="General">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="6,10,6,12">
+                        <TextBlock Text="Core settings" Style="{StaticResource SectionHeader}"/>
 
-                <TextBlock Margin="130,4,0,0" Foreground="Gray"
-             Text="Tip: App ID must be 17–19 digits; click Reconnect to apply without saving."/>
-            </StackPanel>
-            <GroupBox Header="Загальні" Margin="0,0,0,12">
-                <StackPanel Margin="10" Orientation="Vertical" >
-                    <CheckBox Content="Enable Discord Rich Presence"
-                              IsChecked="{Binding EnableRichPresence}" />
-                    <CheckBox Content="Show Platform"
-                              IsChecked="{Binding ShowPlatform}" />
-                    <CheckBox Content="Show Source"
-                              IsChecked="{Binding ShowSource}" />
-                    <CheckBox Content="Show Genres"
-                              IsChecked="{Binding ShowGenre}" />
-                    <CheckBox Content="Show Total Playtime"
-                              IsChecked="{Binding ShowPlaytime}" />
-                    <CheckBox Content="Show session timer (Elapsed)"
-                              IsChecked="{Binding ShowElapsedTime}" />
-                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="Update interval (seconds):" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBox Width="60" Text="{Binding UpdateInterval, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{StaticResource LabelCol}"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- row 0 -->
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Discord App ID:"/>
+                            <TextBox x:Name="AppIdTextBox"
+                       Grid.Column="1"
+                       Text="{Binding DiscordAppId, UpdateSourceTrigger=PropertyChanged}"
+                       PreviewTextInput="AppIdTextBox_PreviewTextInput"
+                       DataObject.Pasting="AppIdTextBox_Pasting"
+                       ToolTip="17–19 digits Discord application (client) ID"/>
+                            <Button Grid.Column="2" Content="Reconnect" Click="Reconnect_Click" Margin="6,0,0,0" />
+
+                            <!-- row 1 -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,6,0,0" Text="Active App ID:"/>
+                            <TextBox  Grid.Row="1" Grid.Column="1" Margin="0,6,0,0" IsReadOnly="True"
+                        Text="{Binding ActiveAppId}" ToolTip="App ID currently used by RPC"/>
+                            <Button   Grid.Row="1" Grid.Column="2" Margin="6,6,0,0" Content="Reset to default" Click="ResetAppId_Click"/>
+
+                            <!-- row 2 -->
+                            <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Margin="0,6,0,0" Text="Update interval (sec):"/>
+                            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,6,0,0">
+                                <TextBox Width="80"
+                         Text="{Binding UpdateInterval, UpdateSourceTrigger=PropertyChanged}"
+                         PreviewTextInput="DigitsOnly_PreviewTextInput"
+                         DataObject.Pasting="DigitsOnly_Pasting"/>
+                                <TextBlock Text=" sec" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <GroupBox Header="Status formatting">
+                            <Grid Margin="8,6,8,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="{StaticResource LabelCol}"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- row 0 -->
+                                <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Default details format:"/>
+                                <TextBox  Grid.Column="1"
+                          Text="{Binding CustomStatus, UpdateSourceTrigger=PropertyChanged}"
+                          ToolTip="Placeholders: {game}, {sessionTime}, {totalPlaytime}, {dayOfWeek}, ..."/>
+
+                                <!-- row 1 -->
+                                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,6,0,0" Text="Fallback small image:"/>
+                                <TextBox  Grid.Row="1" Grid.Column="1" Margin="0,6,0,0"
+                          Text="{Binding FallbackImageKey, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
+                        </GroupBox>
                     </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="Fallback Large Image Key:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBox Width="180" Text="{Binding FallbackImageKey}" />
+            <!-- PRESENCE -->
+            <TabItem Header="Presence">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="6,10,6,12">
+                        <TextBlock Text="What to show in Rich Presence" Style="{StaticResource SectionHeader}"/>
+                        <UniformGrid Columns="2" Rows="2">
+                            <CheckBox Content="Enable Rich Presence"
+            IsChecked="{Binding EnableRichPresence}" Margin="0,0,0,8"/>
+                            <CheckBox Content="Use templates for Rich Presence"
+            IsChecked="{Binding UseTemplates}" Margin="0,0,0,8"/>
+                        </UniformGrid>
+                        <UniformGrid Columns="2" Rows="3">
+                            <CheckBox Content="Show total playtime"      IsChecked="{Binding ShowPlaytime}"/>
+                            <CheckBox Content="Show completion estimate" IsChecked="{Binding ShowCompletionPercentage}"/>
+                            <CheckBox Content="Show achievements"        IsChecked="{Binding ShowAchievements}"/>
+                            <CheckBox Content="Show platform"            IsChecked="{Binding ShowPlatform}"/>
+                            <CheckBox Content="Show genre"               IsChecked="{Binding ShowGenre}"/>
+                            <CheckBox Content="Show source"              IsChecked="{Binding ShowSource}"/>
+                        </UniformGrid>
                     </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="Custom template (fallback):" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <TextBox Width="380" Text="{Binding CustomStatus}" />
+            <!-- BUTTONS -->
+            <TabItem Header="Buttons">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="6,10,6,12">
+                        <TextBlock Text="Discord buttons (max 2, HTTPS only)" Style="{StaticResource SectionHeader}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{StaticResource LabelCol}"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- row 0 -->
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Enable buttons:"/>
+                            <CheckBox Grid.Column="1" IsChecked="{Binding ShowButtons}"/>
+
+                            <!-- row 1 -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Margin="0,6,0,0" Text="Button mode:"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,6,0,0"
+          ItemsSource="{Binding ElementName=Root, Path=ButtonModes}"
+          SelectedItem="{Binding ButtonMode}"/>
+                        </Grid>
+
+                        <TextBlock Margin="0,10,0,0" Foreground="#666"
+                       Text="Note: Non-HTTPS links (e.g., steam://) are ignored by Discord and will not be added."/>
                     </StackPanel>
+                </ScrollViewer>
+            </TabItem>
 
-                    <Button Content="Open folder with mappings (mapping)"
-                            Margin="0,8,0,0"
-                            Click="ButtonOpenMappingsFolder_Click"/>
-                    <Button Content="Open assets folder" Margin="0,8,0,0" Click="ButtonOpenAssets_Click"/>
-                </StackPanel>
-            </GroupBox>
-
-            <!-- Шаблони -->
-            <GroupBox Header="Status Templates" Margin="0,0,0,12">
-                <StackPanel Margin="10" Orientation="Vertical">
-                    <CheckBox Content="Use Templates"
-                              IsChecked="{Binding UseTemplates}" />
-                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
-                               Opacity="0.8">
-                        For fine tuning (enabling/disabling individual templates, priorities), use the manager:
-                    </TextBlock>
-                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <Button Content="Template Manager..." ToolTip="TemplateManagerView"
-                                Padding="10,2"
-                                Tag="templateManager" />
-                        <TextBlock Text="  (10 built-in templates enabled by default)" VerticalAlignment="Center" />
+            <!-- TEMPLATES -->
+            <TabItem Header="Templates">
+                <StackPanel Margin="6,10,6,12">
+                    <TextBlock Text="Status templates" Style="{StaticResource SectionHeader}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Margin="0,0,6,0" Content="Open Template Manager" Click="OpenTemplateManager_Click"/>
+                        <Button Margin="0,0,6,0" Content="Export templates"      Click="ExportTemplates_Click"/>
+                        <Button Margin="0,0,6,0" Content="Import templates"      Click="ImportTemplates_Click"/>
                     </StackPanel>
+                    <TextBlock Margin="0,8,0,0" Foreground="#666"
+                     Text="Use the Template Manager to define prioritized templates with conditions (genres, platforms, time-of-day, days of week, etc.)."/>
                 </StackPanel>
-            </GroupBox>
+            </TabItem>
 
-            <!-- Прогрес -->
-            <GroupBox Header="Progress" Margin="0,0,0,12">
-                <StackPanel Margin="10" Orientation="Vertical">
-                    <CheckBox Content="Show % completion"
-                              IsChecked="{Binding ShowCompletionPercentage}" />
-                    <CheckBox Content="Show achievements"
-                              IsChecked="{Binding ShowAchievements}" />
-                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap"
-                               Opacity="0.8">
-                        Ці поля заповнюються з ExtendedGameInfoService. Якщо дані відсутні — секції не відображаються.
-                    </TextBlock>
-                </StackPanel>
-            </GroupBox>
-
-            <!-- Кнопки -->
-            <GroupBox Header="Discord buttons" Margin="0,0,0,12">
-                <StackPanel Margin="10" Orientation="Vertical">
-                    <CheckBox Content="Show buttons"
-                              IsChecked="{Binding ShowButtons}" />
-
-                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                        <TextBlock Text="Button mode:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                        <ComboBox Width="180"
-                                  SelectedValue="{Binding ButtonMode}"
-                                  SelectedValuePath="Tag">
-                            <ComboBoxItem Tag="{x:Static enums:ButtonDisplayMode.Off}">Off</ComboBoxItem>
-                            <ComboBoxItem Tag="{x:Static enums:ButtonDisplayMode.Auto}">Auto</ComboBoxItem>
-                        </ComboBox>
+            <!-- ASSETS -->
+            <TabItem Header="Assets">
+                <StackPanel Margin="6,10,6,12">
+                    <TextBlock Text="Game art assets" Style="{StaticResource SectionHeader}"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Margin="0,0,6,0" Content="Open assets folder"               Click="OpenAssetsFolder_Click"/>
+                        <Button Margin="0,0,6,0" Content="Open plugin data folder"          Click="OpenMappingsFolder_Click"/>
                     </StackPanel>
-
-                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap" Opacity="0.8">
-                          In “Auto” mode, ButtonService selects up to 2 most relevant buttons (game links, store page, achievements, etc.).
-                    </TextBlock>
+                    <TextBlock Margin="0,8,0,0" Foreground="#666"
+                     Text="Asset keys map to game images for Rich Presence. Generated images are resized to 512–1024px and compressed under 256KB."/>
                 </StackPanel>
-            </GroupBox>
+            </TabItem>
 
-            <!-- Довідка -->
-            <GroupBox Header="Help" Margin="0,0,0,0">
-                <StackPanel Margin="10" Orientation="Vertical">
-                    <TextBlock TextWrapping="Wrap">
-                         Tip: If Discord does not update your status, restart Playnite and the game. Check that EnableRichPresence is enabled.
-                    </TextBlock>
-                    <TextBlock Margin="0,6,0,0" TextWrapping="Wrap">
-                        For custom LargeImageKey images, use the names listed in the mappings.json file in the plugin folder.
-                    </TextBlock>
-                    <TextBlock Margin="8,8,0,0">
-                        <Hyperlink NavigateUri="https://discord.com/developers/applications" RequestNavigate="Hyperlink_RequestNavigate">
-                            Discord Developer Portal
-                        </Hyperlink>
-                    </TextBlock>
-                </StackPanel>
-            </GroupBox>
-
-        </StackPanel>
-    </ScrollViewer>
+            <!-- ADVANCED -->
+            <TabItem Header="Advanced">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="6,10,6,12">
+                        <TextBlock Text="Troubleshooting &amp; diagnostics" Style="{StaticResource SectionHeader}"/>
+                        <CheckBox Content="Verbose logging" IsChecked="{Binding VerboseLogging}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </Grid>
 </UserControl>

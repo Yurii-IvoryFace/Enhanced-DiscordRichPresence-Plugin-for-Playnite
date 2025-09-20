@@ -1,11 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using DiscordRichPresencePlugin.Helpers;
 using DiscordRichPresencePlugin.Models;
 using Playnite.SDK;
 using Playnite.SDK.Data;
 using Playnite.SDK.Models;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
 
 namespace DiscordRichPresencePlugin.Services
 {
@@ -88,7 +90,7 @@ namespace DiscordRichPresencePlugin.Services
             // Update completion
             if (game.CompletionStatus != null)
             {
-                var newCompletion = EstimateCompletionPercentage(game.CompletionStatus);
+                var newCompletion = ProgressUtils.EstimateCompletionPercentage(game.CompletionStatus);
                 if (newCompletion != info.CompletionPercentage)
                 {
                     info.CompletionPercentage = newCompletion;
@@ -240,29 +242,6 @@ namespace DiscordRichPresencePlugin.Services
                 return stats;
             }
         }
-
-        private int EstimateCompletionPercentage(CompletionStatus status)
-        {
-            switch (status.Name?.ToLower())
-            {
-                case "not played":
-                case "unplayed":
-                    return 0;
-                case "playing":
-                case "in progress":
-                    return 25;
-                case "beaten":
-                case "main story":
-                    return 75;
-                case "completed":
-                case "100%":
-                case "completionist":
-                    return 100;
-                default:
-                    return 0;
-            }
-        }
-
         private void SaveData()
         {
             try

@@ -1,10 +1,16 @@
-﻿using System;
+﻿// INPROGRESS
+
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DiscordRichPresencePlugin.Models;
 using DiscordRichPresencePlugin.Enums;
 using Playnite.SDK;
 using Playnite.SDK.Models;
+
+
+// INPROGRESS
 
 namespace DiscordRichPresencePlugin.Services
 {
@@ -72,93 +78,136 @@ namespace DiscordRichPresencePlugin.Services
             // Discord supports maximum 2 buttons
             return buttons.Take(2).ToArray();
         }
+        private static bool IsHttps(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return false;
+            return string.Equals(u.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+        }
 
         /// <summary>
         /// Creates a Join Game button for multiplayer games
         /// </summary>
         private DiscordButton CreateJoinGameButton(Game game, ExtendedGameInfo info)
         {
-            // Check for Steam multiplayer link
-            if (game.GameId != null && game.Source?.Name?.ToLower() == "steam")
+            // 1) HTTPS-join серед Game.Links
+            var httpJoin = game.Links?
+                .FirstOrDefault(l =>
+                    !string.IsNullOrWhiteSpace(l?.Url) &&
+                    IsHttps(l.Url) &&
+                    (
+                        (l.Name?.IndexOf("join", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                        (l.Name?.IndexOf("server", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                        (l.Name?.IndexOf("multiplayer", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0
+                    ));
+
+            if (httpJoin != null)
             {
                 return new DiscordButton
                 {
-                    Label = "Join Game",
-                    Url = $"steam://run/{game.GameId}"
+                    Label = string.IsNullOrWhiteSpace(httpJoin.Name) ? "Join Server" : httpJoin.Name,
+                    Url = httpJoin.Url
                 };
             }
 
-            // Check for other multiplayer links in game links
-            var multiplayerLink = game.Links?.FirstOrDefault(l =>
-                l.Name?.ToLower().Contains("multiplayer") == true ||
-                l.Name?.ToLower().Contains("server") == true);
-
-            if (multiplayerLink != null)
+            // 2) HTTPS із ExtendedInfo.SocialLinks (без ?.)
+            if (info?.SocialLinks != null)
             {
-                return new DiscordButton
+                var kv = info.SocialLinks
+                    .FirstOrDefault(p =>
+                        !string.IsNullOrWhiteSpace(p.Value) &&
+                        IsHttps(p.Value) &&
+                        (
+                            p.Key?.Equals("Server", StringComparison.OrdinalIgnoreCase) == true ||
+                            p.Key?.Equals("Multiplayer", StringComparison.OrdinalIgnoreCase) == true
+                        ));
+
+                if (!string.IsNullOrEmpty(kv.Value))
                 {
-                    Label = "Join Server",
-                    Url = multiplayerLink.Url
-                };
+                    var label = kv.Key != null && kv.Key.Equals("Server", StringComparison.OrdinalIgnoreCase)
+                        ? "Join Server"
+                        : "Join Multiplayer";
+
+                    return new DiscordButton { Label = label, Url = kv.Value };
+                }
             }
 
+            // Нема валідного HTTPS → null
             return null;
         }
+
 
         /// <summary>
         /// Creates a store page button
         /// </summary>
         private DiscordButton CreateStoreButton(Game game, ExtendedGameInfo info)
         {
-            // Priority: Steam > Epic > GOG > Other stores
             string storeUrl = null;
             string storeName = "View in Store";
 
-            // Check extended info store links first
-            if (info?.StoreLinks?.Any() == true)
+            // a) Extended info (пріоритет Steam/Epic/GOG)
+            if (info?.StoreLinks != null && info.StoreLinks.Any())
             {
-                if (info.StoreLinks.TryGetValue("Steam", out storeUrl))
-                    storeName = "View on Steam";
-                else if (info.StoreLinks.TryGetValue("Epic Games", out storeUrl))
-                    storeName = "View on Epic";
-                else if (info.StoreLinks.TryGetValue("GOG", out storeUrl))
-                    storeName = "View on GOG";
+                if (info.StoreLinks.TryGetValue("Steam", out var steamUrl) && IsHttps(steamUrl))
+                {
+                    storeUrl = steamUrl; storeName = "View on Steam";
+                }
+                else if (info.StoreLinks.TryGetValue("Epic Games", out var epicUrl) && IsHttps(epicUrl))
+                {
+                    storeUrl = epicUrl; storeName = "View on Epic";
+                }
+                else if (info.StoreLinks.TryGetValue("GOG", out var gogUrl) && IsHttps(gogUrl))
+                {
+                    storeUrl = gogUrl; storeName = "View on GOG";
+                }
                 else
-                    storeUrl = info.StoreLinks.First().Value;
+                {
+                    // перший HTTPS у словнику
+                    var firstHttps = info.StoreLinks.FirstOrDefault(kv => IsHttps(kv.Value));
+                    if (!string.IsNullOrEmpty(firstHttps.Value))
+                    {
+                        storeUrl = firstHttps.Value;
+                        if (!string.IsNullOrWhiteSpace(firstHttps.Key))
+                            storeName = $"View on {firstHttps.Key}";
+                    }
+                }
             }
 
-            // Fallback to game links
-            if (string.IsNullOrEmpty(storeUrl))
+            // b) Якщо з ExtendedInfo не знайшли — шукаємо в Game.Links
+            if (string.IsNullOrEmpty(storeUrl) && game.Links?.Any() == true)
             {
-                var storeLink = game.Links?.FirstOrDefault(l =>
-                    l.Name?.ToLower().Contains("store") == true ||
-                    l.Name?.ToLower().Contains("steam") == true ||
-                    l.Name?.ToLower().Contains("epic") == true ||
-                    l.Name?.ToLower().Contains("gog") == true);
+                var storeLink = game.Links.FirstOrDefault(l =>
+                    !string.IsNullOrWhiteSpace(l?.Url) &&
+                    IsHttps(l.Url) &&
+                    (
+                        (l.Name?.IndexOf("store", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                        (l.Name?.IndexOf("steam", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                        (l.Name?.IndexOf("epic", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                        (l.Name?.IndexOf("gog", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0
+                    ));
 
                 if (storeLink != null)
                 {
                     storeUrl = storeLink.Url;
-                    if (storeLink.Name.ToLower().Contains("steam"))
-                        storeName = "View on Steam";
-                    else if (storeLink.Name.ToLower().Contains("epic"))
-                        storeName = "View on Epic";
-                    else if (storeLink.Name.ToLower().Contains("gog"))
-                        storeName = "View on GOG";
+                    if ((storeLink.Name?.IndexOf("steam", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0) storeName = "View on Steam";
+                    else if ((storeLink.Name?.IndexOf("epic", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0) storeName = "View on Epic";
+                    else if ((storeLink.Name?.IndexOf("gog", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0) storeName = "View on GOG";
                 }
             }
 
-            if (!string.IsNullOrEmpty(storeUrl))
+            // c) Фолбек на Steam за GameId (HTTPS)
+            if (string.IsNullOrEmpty(storeUrl) &&
+                game.Source?.Name?.Equals("steam", StringComparison.OrdinalIgnoreCase) == true &&
+                !string.IsNullOrEmpty(game.GameId) &&
+                game.GameId.All(char.IsDigit))
             {
-                return new DiscordButton
-                {
-                    Label = storeName,
-                    Url = storeUrl
-                };
+                storeUrl = $"https://store.steampowered.com/app/{game.GameId}/";
+                storeName = "View on Steam";
             }
 
-            return null;
+            return IsHttps(storeUrl) ? new DiscordButton { Label = storeName, Url = storeUrl } : null;
         }
+
 
         /// <summary>
         /// Creates an achievement tracking button
@@ -199,71 +248,65 @@ namespace DiscordRichPresencePlugin.Services
         /// </summary>
         private DiscordButton CreateCommunityButton(Game game, ExtendedGameInfo info)
         {
-            // Check extended info social links
-            if (info?.SocialLinks?.Any() == true)
+            // a) Extended info
+            if (info?.SocialLinks != null && info.SocialLinks.Any())
             {
-                // Priority: Discord > Reddit > Forums > Other
-                string url = null;
-                string label = "Community";
-
-                if (info.SocialLinks.TryGetValue("Discord", out url))
-                    label = "Join Discord";
-                else if (info.SocialLinks.TryGetValue("Reddit", out url))
-                    label = "Reddit Community";
-                else if (info.SocialLinks.TryGetValue("Forum", out url))
-                    label = "Game Forum";
-                else
+                foreach (var key in new[] { "Discord", "Reddit", "Forum", "Community" })
                 {
-                    var first = info.SocialLinks.First();
-                    url = first.Value;
-                    label = first.Key;
+                    if (info.SocialLinks.TryGetValue(key, out var url) && IsHttps(url))
+                    {
+                        var label = key.Equals("Discord", StringComparison.OrdinalIgnoreCase) ? "Join Discord"
+                                  : key.Equals("Reddit", StringComparison.OrdinalIgnoreCase) ? "Reddit Community"
+                                  : key.Equals("Forum", StringComparison.OrdinalIgnoreCase) ? "Game Forum"
+                                  : "Community";
+                        return new DiscordButton { Label = label, Url = url };
+                    }
                 }
-
-                return new DiscordButton { Label = label, Url = url };
             }
 
-            // Check game links for community
+            // b) Game.Links
             var communityLink = game.Links?.FirstOrDefault(l =>
-                l.Name?.ToLower().Contains("discord") == true ||
-                l.Name?.ToLower().Contains("reddit") == true ||
-                l.Name?.ToLower().Contains("forum") == true ||
-                l.Name?.ToLower().Contains("community") == true);
+                !string.IsNullOrWhiteSpace(l?.Url) &&
+                IsHttps(l.Url) &&
+                (
+                    (l.Name?.IndexOf("discord", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                    (l.Name?.IndexOf("reddit", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                    (l.Name?.IndexOf("forum", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0 ||
+                    (l.Name?.IndexOf("community", StringComparison.OrdinalIgnoreCase) ?? -1) >= 0
+                ));
 
-            if (communityLink != null)
-            {
-                return new DiscordButton
+            return communityLink != null
+                ? new DiscordButton
                 {
-                    Label = communityLink.Name,
+                    Label = string.IsNullOrWhiteSpace(communityLink.Name) ? "Community" : communityLink.Name,
                     Url = communityLink.Url
-                };
-            }
-
-            return null;
+                }
+                : null;
         }
+
 
         /// <summary>
         /// Creates a default fallback button
         /// </summary>
         private DiscordButton CreateDefaultButton(Game game)
         {
-            // If game has any links, use the first one
-            if (game.Links?.Any() == true)
+            var firstHttps = game.Links?.FirstOrDefault(l => IsHttps(l?.Url));
+            if (firstHttps != null)
             {
-                var firstLink = game.Links.First();
                 return new DiscordButton
                 {
-                    Label = firstLink.Name ?? "Game Info",
-                    Url = firstLink.Url
+                    Label = string.IsNullOrWhiteSpace(firstHttps.Name) ? "Game Info" : firstHttps.Name,
+                    Url = firstHttps.Url
                 };
             }
-
-            // Ultimate fallback - Playnite game link
+            var q = Uri.EscapeDataString(game?.Name ?? "game");
             return new DiscordButton
             {
-                Label = "View in Playnite",
-                Url = $"playnite://playnite/game/{game.Id}"
+                Label = "Search the game",
+                Url = $"https://www.google.com/search?q={q}"
             };
         }
+
 
         /// <summary>
         /// Creates custom buttons from user configuration

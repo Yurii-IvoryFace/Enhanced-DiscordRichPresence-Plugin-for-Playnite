@@ -6,6 +6,7 @@ using Playnite.SDK.Models;
 using DiscordRichPresencePlugin.Enums;
 using DiscordRichPresencePlugin.Models;
 using DiscordRichPresencePlugin.Services;
+using DiscordRichPresencePlugin.Helpers;
 
 namespace DiscordRichPresencePlugin.Services
 {
@@ -144,7 +145,7 @@ namespace DiscordRichPresencePlugin.Services
                     StartTimestamp = startTimestamp,
                     LargeImageKey = GetGameImageKey(),
                     LargeImageText = currentGame.Name,
-                    SmallImageKey = "playnite_logo",
+                    SmallImageKey = Constants.DEFAULT_FALLBACK_IMAGE,
                     SmallImageText = "via Playnite",
                     Buttons = buttons
                 };
@@ -159,38 +160,69 @@ namespace DiscordRichPresencePlugin.Services
 
         private string FormatGameDetails()
         {
-            if (currentGame == null)
-                return string.Empty;
+            if (currentGame == null) return string.Empty;
 
-            // Template-based Details
             if (settings.UseTemplates && templateService != null)
             {
                 var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
-                var formatted = templateService.FormatTemplateString(t?.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
-                if (!string.IsNullOrWhiteSpace(formatted))
-                    return formatted;
+                if (t != null)
+                {
+                    var formatted = templateService.FormatTemplateString(
+                        t.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
+                    if (!string.IsNullOrWhiteSpace(formatted))
+                    {
+                        logger.Debug($"[DRP][Templates] Using template for Details: '{t.Name}' (Priority={t.Priority})");
+                        return formatted;
+                    }
+                    else
+                    {
+                        logger.Debug($"[DRP][Templates] Template '{t?.Name}' produced empty Details, will fallback.");
+                    }
+                }
+                else
+                {
+                    logger.Debug("[DRP][Templates] No matching template for Details (UseTemplates=ON).");
+                }
             }
 
-            // Fallback to simple custom format
-            var template = string.IsNullOrEmpty(settings.CustomStatus)
+            // Fallback: CustomStatus / default
+            var tmpl = string.IsNullOrWhiteSpace(settings.CustomStatus)
                 ? Constants.DEFAULT_STATUS_FORMAT
                 : settings.CustomStatus;
 
-            return template.Replace("{game}", currentGame.Name);
+            var fb = templateService != null
+                ? templateService.FormatTemplateString(tmpl, currentGame, currentExtendedInfo, gameStartTime)
+                : tmpl.Replace("{game}", currentGame.Name);
+
+            logger.Debug($"[DRP][Fallback] Details='{fb}'");
+            return fb;
         }
 
         private string FormatGameState()
         {
-            if (currentGame == null)
-                return string.Empty;
+            if (currentGame == null) return string.Empty;
 
-            // Template-based State
             if (settings.UseTemplates && templateService != null)
             {
                 var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
-                var formatted = templateService.FormatTemplateString(t?.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
-                if (!string.IsNullOrWhiteSpace(formatted))
-                    return formatted;
+                if (t != null)
+                {
+                    var formatted = templateService.FormatTemplateString(
+                        t.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
+                    if (!string.IsNullOrWhiteSpace(formatted))
+                    {
+                        logger.Debug($"[DRP][Templates] Using template for State: '{t.Name}' (Priority={t.Priority})");
+                        return formatted;
+                    }
+                    else
+                    {
+                        logger.Debug($"[DRP][Templates] Template '{t?.Name}' produced empty State, will fallback.");
+                    }
+                }
+                else
+                {
+                    logger.Debug("[DRP][Templates] No matching template for State (UseTemplates=ON).");
+                }
             }
 
             // Legacy/manual construction with optional extras
@@ -217,17 +249,7 @@ namespace DiscordRichPresencePlugin.Services
             // Total playtime (seconds -> H/M)
             if (settings.ShowPlaytime && currentGame.Playtime > 0)
             {
-                var totalSeconds = (long)currentGame.Playtime;
-                var hours = totalSeconds / 3600;
-                var minutes = (totalSeconds % 3600) / 60;
-                if (hours > 0)
-                {
-                    parts.Add($"{hours}h {minutes}m played");
-                }
-                else
-                {
-                    parts.Add($"{minutes}m played");
-                }
+                parts.Add(TimeFormat.FormatPlaytimeSeconds((long)currentGame.Playtime));
             }
 
             // Progress (from ExtendedGameInfo)
@@ -240,8 +262,9 @@ namespace DiscordRichPresencePlugin.Services
             {
                 parts.Add($"🏆 {currentExtendedInfo.AchievementsEarned}/{currentExtendedInfo.TotalAchievements}");
             }
-
-            return string.Join(" | ", parts);
+            var state = string.Join(" · ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+            logger.Debug($"[DRP][Fallback] State='{state}'");
+            return state;
         }
 
         private string GetGameImageKey()
