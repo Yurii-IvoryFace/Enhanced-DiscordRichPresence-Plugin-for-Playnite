@@ -1,4 +1,4 @@
-﻿using DiscordRichPresencePlugin.Models;
+using DiscordRichPresencePlugin.Models;
 using DiscordRichPresencePlugin.Enums;
 using Playnite.SDK;
 using System;

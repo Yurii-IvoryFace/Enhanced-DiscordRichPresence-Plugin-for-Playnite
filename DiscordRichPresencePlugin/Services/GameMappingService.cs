@@ -26,6 +26,7 @@ namespace DiscordRichPresencePlugin.Services
 
             EnsureMappingsStorage();
             LoadMappings();
+            EnsureMappingsFileExists();
         }
 
         private void LoadMappings()
@@ -87,6 +88,7 @@ namespace DiscordRichPresencePlugin.Services
         public string GetMappingsFilePath() => mappingsFilePath;
 
         public bool EnsureMappingsStorage(bool createIfMissing = true)
+
         {
             lock (lockObject)
             {
@@ -183,6 +185,7 @@ namespace DiscordRichPresencePlugin.Services
         {
             if (games == null) return 0;
             EnsureMappingsStorage();
+
             int added = 0;
             lock (lockObject)
             {
@@ -494,7 +497,6 @@ namespace DiscordRichPresencePlugin.Services
             var slug = System.Text.RegularExpressions.Regex
                 .Replace((name ?? "").ToLowerInvariant(), "[^a-z0-9]+", "_")
                 .Trim('_');
-
             if (string.IsNullOrWhiteSpace(slug))
                 slug = "game";
 
@@ -525,4 +527,3 @@ namespace DiscordRichPresencePlugin.Services
         }
     }
 }
-

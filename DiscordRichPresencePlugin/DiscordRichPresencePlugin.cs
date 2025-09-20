@@ -12,7 +12,6 @@ using System.IO;
 
 using TMNS = DiscordRichPresencePlugin.UI;
 
-
 namespace DiscordRichPresencePlugin
 {
     public class DiscordRichPresencePlugin : GenericPlugin
@@ -214,7 +213,6 @@ namespace DiscordRichPresencePlugin
 
             imageManager.OpenAssetsFolder();
         }
-
         public void ShowTemplateManagerWindow()
         {
             try
@@ -281,18 +279,19 @@ namespace DiscordRichPresencePlugin
                     MenuSection = "@Discord Rich Presence",
                     Description = "Open assets folder",
                     Action = _ => imageManager?.OpenAssetsFolder()
+
                 },
                 new MainMenuItem
-{
-    MenuSection = "@Discord Rich Presence",
-    Description = "Clean unused assets",
-    Action = _ =>
-    {
-        var removed = imageManager.CleanupOrphanAssets();
-        PlayniteApi?.Dialogs?.ShowMessage($"Removed {removed} orphan asset file(s).", "Discord Rich Presence");
-        imageManager.OpenAssetsFolder();
-    }
-},
+                {
+                MenuSection = "@Discord Rich Presence",
+                Description = "Clean unused assets",
+                Action = _ =>
+                {
+                  var removed = imageManager.CleanupOrphanAssets();
+                  PlayniteApi?.Dialogs?.ShowMessage($"Removed {removed} orphan asset file(s).", "Discord Rich Presence");
+                  imageManager.OpenAssetsFolder();
+                 }
+                },
             };
         }
 
@@ -306,10 +305,10 @@ namespace DiscordRichPresencePlugin
         }
 
         public override ISettings GetSettings(bool firstRunSettings) => settings;
+
         public override UserControl GetSettingsView(bool firstRunSettings)
         {
             return new global::DiscordRichPresencePlugin_UI.DiscordRichPresenceSettingsView(settings, imageManager, ShowTemplateManagerWindow);
         }
     }
 }
-

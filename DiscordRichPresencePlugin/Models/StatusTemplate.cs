@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+
 namespace DiscordRichPresencePlugin.Models
 {
     /// <summary>
@@ -98,4 +99,3 @@ namespace DiscordRichPresencePlugin.Models
         public const string SessionPhrase = "{phrase}";
     }
 }
-

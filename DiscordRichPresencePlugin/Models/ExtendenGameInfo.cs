@@ -1,4 +1,4 @@
-﻿using DiscordRichPresencePlugin.Helpers;
+using DiscordRichPresencePlugin.Helpers;
 using Playnite.SDK.Models;
 using System;
 using System.Collections.Generic;

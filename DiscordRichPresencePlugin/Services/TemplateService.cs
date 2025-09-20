@@ -206,7 +206,6 @@ namespace DiscordRichPresencePlugin.Services
                     }
                 }
 
-
                 enabled = templates.Where(t => t.IsEnabled).ToList();
             }
             logger?.Debug($"[Templates] Game: {game.Name}, Genres: {string.Join(", ", game.Genres?.Select(g => g.Name) ?? new[] { "none" })}");
@@ -240,6 +239,23 @@ namespace DiscordRichPresencePlugin.Services
             return score;
         }
 
+        private static int GetSpecificityScore(TemplateConditions c)
+        {
+            if (c == null) return 0;
+            int s = 0;
+            if (c.MinPlaytimeMinutes.HasValue || c.MaxPlaytimeMinutes.HasValue) s++;
+            if (c.MinSessionTimeMinutes.HasValue || c.MaxSessionTimeMinutes.HasValue) s++;
+            if (c.Genres?.Count > 0) s += 2;
+            if (c.Platforms?.Count > 0) s += 2;
+            if (c.Sources?.Count > 0) s++;
+            if (c.CompletionPercentage != null) s++;
+            if (c.TimeOfDay?.StartHour != null || c.TimeOfDay?.EndHour != null) s++;
+            if (c.HasMultiplayer.HasValue) s++;
+            if (c.HasCoop.HasValue) s++;
+            return s;
+        }
+
+
         /// <summary>
         /// Checks if conditions match current game state
         /// </summary>
@@ -254,7 +270,6 @@ namespace DiscordRichPresencePlugin.Services
             {
                 platOk = (game?.Platforms?.Any(p => c.Platforms.Contains(p.Name, StringComparer.OrdinalIgnoreCase)) == true);
             }
-
             // Genres
             if (c.Genres != null && c.Genres.Count > 0)
             {

@@ -321,7 +321,6 @@ namespace DiscordRichPresencePlugin.Services
 
             if (sw <= 0 || sh <= 0)
                 return src;
-
             // Обчислюємо допустимий масштаб s:
             // 512 ≤ min(sw*s, sh*s),  max(sw*s, sh*s) ≤ 1024
             // sLower = 512 / min(sw,sh), sUpper = 1024 / max(sw,sh)
@@ -358,7 +357,6 @@ namespace DiscordRichPresencePlugin.Services
                 double oy = (canvasH - th) / 2.0;
                 dc.DrawImage(scaled, new System.Windows.Rect(ox, oy, tw, th));
             }
-
             var rtb = new RenderTargetBitmap(canvasW, canvasH, 96, 96, PixelFormats.Pbgra32);
             rtb.Render(dv);
             rtb.Freeze();
