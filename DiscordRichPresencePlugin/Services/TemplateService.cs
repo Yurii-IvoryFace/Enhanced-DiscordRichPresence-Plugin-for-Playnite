@@ -342,9 +342,9 @@ playtimeOk && sessionOk && completionOk && mpOk && coopOk;
 
             var result = template;
 
-            // Basic game info
+            // Basic game info replacements
             result = result.Replace(TemplateVariables.GameName, game?.Name ?? "Unknown");
-            //result = result.Replace(TemplateVariables.Platform, game?.Platforms?.FirstOrDefault()?.Name ?? "PC");
+            result = result.Replace(TemplateVariables.Platform, game?.Platforms?.FirstOrDefault()?.Name ?? "PC");
             result = result.Replace(TemplateVariables.Source, game?.Source?.Name ?? "");
             result = result.Replace(TemplateVariables.Genre, game?.Genres?.FirstOrDefault()?.Name ?? "");
 
