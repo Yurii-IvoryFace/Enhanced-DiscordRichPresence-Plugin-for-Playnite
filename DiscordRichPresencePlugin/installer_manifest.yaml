@@ -1,0 +1,24 @@
+AddonId: ivoryface_7ad84e05-6c01-4b13-9b12-86af81775396
+Packages:
+  - Version: 1.1.1
+    RequiredApiVersion: 6.2.0
+    ReleaseDate: 2025-10-07
+    PackageUrl: https://github.com/Yurii-IvoryFace/Enhanced-DiscordRichPresence-Plugin-for-Playnite/releases/download/v1.1.1/DiscordRichPresenceEnhanced_1_1_1.pext
+    Changelog:
+      - Improved stability of connection to Discord
+      - Fixed reconnection issue
+      - Optimization of asynchronous operations
+  - Version: 1.1
+    RequiredApiVersion: 6.9.0
+    ReleaseDate: 2025-09-23
+    PackageUrl: https://github.com/Yurii-IvoryFace/Enhanced-DiscordRichPresence-Plugin-for-Playnite/releases/download/v1.1/DiscordRichPresenceEnhanced_1_1.pext
+    Changelog:
+      - Refactor template system for better customization
+      - New UI
+      - Bug Fixes And Minor impovements
+  - Version: 1.0
+    RequiredApiVersion: 6.9.0
+    ReleaseDate: 2025-09-02
+    PackageUrl: https://github.com/Yurii-IvoryFace/Enhanced-DiscordRichPresence-Plugin-for-Playnite/releases/download/v1.0/DiscordRichPresenceEnhanced_1_0.pext
+    Changelog:
+      - Initial Release
