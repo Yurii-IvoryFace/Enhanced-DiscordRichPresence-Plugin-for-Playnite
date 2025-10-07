@@ -57,7 +57,7 @@ namespace DiscordRichPresencePlugin.Services
         }
 
         /// <summary>
-        /// Повна переініціалізація з новим App ID (викликати після зміни налаштувань).
+        /// Complete reinitialization with a new App ID (call after changing settings).
         /// </summary>
         public void Reinitialize(string newAppId)
         {
@@ -70,19 +70,19 @@ namespace DiscordRichPresencePlugin.Services
 
             logger.Info($"Reinitializing Discord RPC: {appId} -> {target}");
 
-            // зупинити таймер, прибрати старий RPC
+            // stop the timer, remove the old RPC
             try { presenceUpdateTimer?.Stop(); } catch { }
             presenceUpdateTimer?.Dispose();
             presenceUpdateTimer = null;
 
             try { discordRPC?.Dispose(); } catch { }
 
-            // створити новий RPC і ініціалізувати
+            // create a new RPC and initialize it
             appId = target;
             discordRPC = new CustomDiscordRPC(appId, logger);
             discordRPC.Initialize();
 
-            // якщо гра активна — відновити presence і таймер
+            // if the game is active — restore presence and timer
             if (currentGame != null)
             {
                 UpdatePresence();
@@ -318,7 +318,7 @@ namespace DiscordRichPresencePlugin.Services
         {
             if (string.IsNullOrWhiteSpace(url)) return false;
             if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return false;
-            // Discord зазвичай приймає тільки HTTPS для кнопок
+            // Discord usually only accepts HTTPS for buttons.
             return string.Equals(u.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
         }
 

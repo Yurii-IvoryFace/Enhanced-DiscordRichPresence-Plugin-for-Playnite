@@ -179,7 +179,7 @@ namespace DiscordRichPresencePlugin
                         progress.CurrentProgressValue++;
                     }
 
-                    // ФАЗА 2: assets
+                    // PHASE 2: assets
                     foreach (var game in games)
                     {
                         if (progress.CancelToken.IsCancellationRequested)

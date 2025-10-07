@@ -87,7 +87,7 @@ namespace DiscordRichPresencePlugin
             var oldId = editingClone?.DiscordAppId?.Trim() ?? string.Empty;
             var newId = DiscordAppId?.Trim() ?? string.Empty;
 
-            SaveSettings(); // збережеться в config.json, бо тепер властивість є
+            SaveSettings(); // will be saved in config.json, because now the property is
 
             if (!string.Equals(oldId, newId, StringComparison.Ordinal))
             {

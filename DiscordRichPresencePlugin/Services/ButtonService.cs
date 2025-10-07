@@ -90,7 +90,7 @@ namespace DiscordRichPresencePlugin.Services
         /// </summary>
         private DiscordButton CreateJoinGameButton(Game game, ExtendedGameInfo info)
         {
-            // 1) HTTPS-join серед Game.Links
+            // 1) HTTPS-join in Game.Links
             var httpJoin = game.Links?
                 .FirstOrDefault(l =>
                     !string.IsNullOrWhiteSpace(l?.Url) &&
@@ -110,7 +110,7 @@ namespace DiscordRichPresencePlugin.Services
                 };
             }
 
-            // 2) HTTPS із ExtendedInfo.SocialLinks (без ?.)
+            // 2) HTTPS із ExtendedInfo.SocialLinks (whithout ?.)
             if (info?.SocialLinks != null)
             {
                 var kv = info.SocialLinks
@@ -132,7 +132,7 @@ namespace DiscordRichPresencePlugin.Services
                 }
             }
 
-            // Нема валідного HTTPS → null
+            // No valid HTTPS → null
             return null;
         }
 
@@ -145,7 +145,7 @@ namespace DiscordRichPresencePlugin.Services
             string storeUrl = null;
             string storeName = "View in Store";
 
-            // a) Extended info (пріоритет Steam/Epic/GOG)
+            // a) Extended info (priority Steam/Epic/GOG)
             if (info?.StoreLinks != null && info.StoreLinks.Any())
             {
                 if (info.StoreLinks.TryGetValue("Steam", out var steamUrl) && IsHttps(steamUrl))
@@ -162,7 +162,7 @@ namespace DiscordRichPresencePlugin.Services
                 }
                 else
                 {
-                    // перший HTTPS у словнику
+                    // first HTTPS in storage
                     var firstHttps = info.StoreLinks.FirstOrDefault(kv => IsHttps(kv.Value));
                     if (!string.IsNullOrEmpty(firstHttps.Value))
                     {
@@ -173,7 +173,7 @@ namespace DiscordRichPresencePlugin.Services
                 }
             }
 
-            // b) Якщо з ExtendedInfo не знайшли — шукаємо в Game.Links
+            // b) If not found in ExtendedInfo look in Game.Links
             if (string.IsNullOrEmpty(storeUrl) && game.Links?.Any() == true)
             {
                 var storeLink = game.Links.FirstOrDefault(l =>
@@ -195,7 +195,7 @@ namespace DiscordRichPresencePlugin.Services
                 }
             }
 
-            // c) Фолбек на Steam за GameId (HTTPS)
+            // c) fallback on Steam for GameId (HTTPS)
             if (string.IsNullOrEmpty(storeUrl) &&
                 game.Source?.Name?.Equals("steam", StringComparison.OrdinalIgnoreCase) == true &&
                 !string.IsNullOrEmpty(game.GameId) &&

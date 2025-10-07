@@ -219,7 +219,7 @@ namespace DiscordRichPresencePlugin.Services
                 {
                     //logger.Debug($"Setting presence: {presence?.Details} | {presence?.State}");
 
-                    // Створюємо об'єкт activity з умовним включенням buttons
+                    // Create an activity object with conditional inclusion of buttons
                     var activity = new
                     {
                         details = presence?.Details,
@@ -234,7 +234,7 @@ namespace DiscordRichPresencePlugin.Services
                         }
                     };
 
-                    // Створюємо payload базовий
+                    // Creating a basic payload
                     var payload = new
                     {
                         cmd = "SET_ACTIVITY",
@@ -242,7 +242,7 @@ namespace DiscordRichPresencePlugin.Services
                         {
                             pid = System.Diagnostics.Process.GetCurrentProcess().Id,
                             activity = presence?.Buttons?.Any() == true ?
-                                // Якщо є кнопки, додаємо їх до activity
+                                // If there are buttons, add them to the activity
                                 new
                                 {
                                     activity.details,
@@ -251,7 +251,7 @@ namespace DiscordRichPresencePlugin.Services
                                     activity.assets,
                                     buttons = presence.Buttons.Select(b => new { label = b.Label, url = b.Url }).ToArray()
                                 } :
-                                // Якщо немає кнопок, не включаємо поле buttons взагалі
+                                // If there are no buttons, do not include the buttons field at all.
                                 (object)activity
                         },
                         nonce = GetNextNonce().ToString()
@@ -259,7 +259,7 @@ namespace DiscordRichPresencePlugin.Services
 
                     await SendAsync(OpCode.Frame, payload);
 
-                    // Читаємо відповідь від Discord
+                    // Reading the response from Discord
                     var response = await ReadResponseAsync();
                     if (!string.IsNullOrEmpty(response))
                     {
@@ -343,8 +343,8 @@ namespace DiscordRichPresencePlugin.Services
                 var opCode = BitConverter.ToInt32(header, 0);
                 var length = BitConverter.ToInt32(header, 4);
 
-                // Проста валідація довжини (запобігає OOM/помилкам)
-                const int MaxPayloadBytes = 1 << 20; // 1 MiB — з великим запасом
+                // Simple length validation (prevents OOM/errors)
+                const int MaxPayloadBytes = 1 << 20; // 1 MiB
                 if (length < 0 || length > MaxPayloadBytes)
                 {
                     throw new InvalidDataException($"Invalid Discord IPC payload length: {length}");

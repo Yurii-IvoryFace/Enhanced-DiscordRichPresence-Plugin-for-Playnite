@@ -222,7 +222,7 @@ namespace DiscordRichPresencePlugin.Services
             if (candidates.Count == 0)
                 return null;
 
-            // Найбільш специфічний → далі пріоритет зростання (де 1 — найвищий)
+            // Most specific → further growth priority (where 1 is the highest)
             return candidates
                 .OrderByDescending(t => GetSpecificityScore(t.Conditions))
                 .ThenBy(t => t.Priority)
