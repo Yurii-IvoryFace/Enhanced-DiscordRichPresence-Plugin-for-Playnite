@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 
 namespace DiscordRichPresencePlugin.Services
@@ -246,14 +247,34 @@ namespace DiscordRichPresencePlugin.Services
         {
             try
             {
-                var json = Serialization.ToJson(gameInfoCache, true);
-                File.WriteAllText(dataFilePath, json);
+                // Fire-and-forget async write to avoid blocking UI/event threads.
+                _ = SaveDataAsync();
             }
             catch (Exception ex)
             {
                 logger?.Error($"Failed to save extended game info: {ex.Message}");
             }
         }
+
+        private async Task SaveDataAsync()
+        {
+            try
+            {
+                string json;
+                lock (lockObject)
+                {
+                    json = Serialization.ToJson(gameInfoCache, true);
+                }
+                var dir = Path.GetDirectoryName(dataFilePath);
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                await IOAsyncUtils.WriteAllTextAsync(dataFilePath, json).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger?.Error($"Failed to save extended game info (async): {ex.Message}");
+            }
+        }
+
 
         /// <summary>
         /// Clears data for games not in library
