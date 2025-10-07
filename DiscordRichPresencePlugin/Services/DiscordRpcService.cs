@@ -137,16 +137,23 @@ namespace DiscordRichPresencePlugin.Services
 
             try
             {
+                // Select template once per update to avoid duplicate work
+                StatusTemplate selectedTemplate = null;
+                if (settings.UseTemplates && templateService != null)
+                {
+                    selectedTemplate = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
+                }
+
                 var startTimestamp = settings.ShowElapsedTime
-                    ? ((DateTimeOffset)gameStartTime).ToUnixTimeSeconds()
-                    : 0;
+    ? ((DateTimeOffset)gameStartTime).ToUnixTimeSeconds()
+    : 0;
 
                 var buttons = BuildButtons();
 
                 var presence = new DiscordPresence
                 {
-                    Details = FormatGameDetails(),
-                    State = FormatGameState(),
+                    Details = FormatGameDetails(selectedTemplate),
+                    State = FormatGameState(selectedTemplate),
                     StartTimestamp = startTimestamp,
                     LargeImageKey = GetGameImageKey(),
                     LargeImageText = currentGame.Name,
@@ -163,27 +170,19 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-        private string FormatGameDetails()
+        private string FormatGameDetails(StatusTemplate selectedTemplate)
         {
             if (currentGame == null) return string.Empty;
 
-            if (settings.UseTemplates && templateService != null)
+            if (settings.UseTemplates && templateService != null && selectedTemplate != null)
             {
-                var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
-                if (t != null)
+                var formatted = templateService.FormatTemplateString(selectedTemplate.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
+                if (!string.IsNullOrWhiteSpace(formatted))
                 {
-                    var formatted = templateService.FormatTemplateString(t.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
-                    if (!string.IsNullOrWhiteSpace(formatted))
-                    {
-                        logger.Debug($"[DRP][Templates] Using template for Details: '{t.Name}' (Priority={t.Priority})");
-                        return formatted;
-                    }
-                    logger.Debug($"[DRP][Templates] Template '{t?.Name}' produced empty Details, will fallback.");
+                    logger.Debug($"[DRP][Templates] Using template for Details: '{selectedTemplate.Name}' (Priority={selectedTemplate.Priority})");
+                    return formatted;
                 }
-                else
-                {
-                    logger.Debug("[DRP][Templates] No matching template for Details (UseTemplates=ON).");
-                }
+                logger.Debug($"[DRP][Templates] Template '{selectedTemplate.Name}' produced empty Details, will fallback.");
             }
 
             // Fallback: CustomStatus / default
@@ -199,25 +198,20 @@ namespace DiscordRichPresencePlugin.Services
             return fb;
         }
 
-        private string FormatGameState()
+        private string FormatGameState(StatusTemplate selectedTemplate)
         {
-            if (settings.UseTemplates && templateService != null)
+
+            if (currentGame == null) return string.Empty;
+
+            if (settings.UseTemplates && templateService != null && selectedTemplate != null)
             {
-                var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
-                if (t != null)
+                var formatted = templateService.FormatTemplateString(selectedTemplate.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
+                if (!string.IsNullOrWhiteSpace(formatted))
                 {
-                    var formatted = templateService.FormatTemplateString(t.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
-                    if (!string.IsNullOrWhiteSpace(formatted))
-                    {
-                        logger.Debug($"[DRP][Templates] Using template for State: '{t.Name}' (Priority={t.Priority})");
-                        return formatted;
-                    }
-                    logger.Debug($"[DRP][Templates] Template '{t?.Name}' produced empty State, will fallback.");
+                    logger.Debug($"[DRP][Templates] Using template for State: '{selectedTemplate.Name}' (Priority={selectedTemplate.Priority})");
+                    return formatted;
                 }
-                else
-                {
-                    logger.Debug("[DRP][Templates] No matching template for State (UseTemplates=ON).");
-                }
+                logger.Debug($"[DRP][Templates] Template '{selectedTemplate.Name}' produced empty State, will fallback.");
             }
 
             // Legacy/manual construction with optional extras
