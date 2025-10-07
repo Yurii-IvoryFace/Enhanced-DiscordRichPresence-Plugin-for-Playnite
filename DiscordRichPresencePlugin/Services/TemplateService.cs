@@ -253,17 +253,26 @@ namespace DiscordRichPresencePlugin.Services
         {
             if (c == null) return true;
 
-            bool platOk = true, genreOk = true, hoursOk = true, daysOk = true;
+            bool platOk = true, genreOk = true, hoursOk = true, daysOk = true, srcOk = true;
+            bool playtimeOk = true, sessionOk = true, completionOk = true, mpOk = true, coopOk = true;
 
             // Platforms
             if (c.Platforms != null && c.Platforms.Count > 0)
             {
                 platOk = (game?.Platforms?.Any(p => c.Platforms.Contains(p.Name, StringComparer.OrdinalIgnoreCase)) == true);
             }
+
             // Genres
             if (c.Genres != null && c.Genres.Count > 0)
             {
                 genreOk = (game?.Genres?.Any(g => c.Genres.Contains(g.Name, StringComparer.OrdinalIgnoreCase)) == true);
+            }
+
+            // Source
+            if (c.Sources != null && c.Sources.Count > 0)
+            {
+                var srcName = game?.Source?.Name ?? string.Empty;
+                srcOk = c.Sources.Any(s => string.Equals(s, srcName, StringComparison.OrdinalIgnoreCase));
             }
 
             // Time of day (22-2)
@@ -281,7 +290,44 @@ namespace DiscordRichPresencePlugin.Services
                 daysOk = c.DaysOfWeek.Contains(DateTime.Now.DayOfWeek);
             }
 
-            return platOk && genreOk && hoursOk && daysOk;
+            // Total playtime minutes (Playnite stores seconds)
+            if (c.MinPlaytimeMinutes.HasValue || c.MaxPlaytimeMinutes.HasValue)
+            {
+                var playedMinutes = (int)Math.Max(0, (game?.Playtime ?? 0) / 60);
+                if (c.MinPlaytimeMinutes.HasValue && playedMinutes < c.MinPlaytimeMinutes.Value) playtimeOk = false;
+                if (c.MaxPlaytimeMinutes.HasValue && playedMinutes > c.MaxPlaytimeMinutes.Value) playtimeOk = false;
+            }
+
+            // Current session minutes (from sessionStart)
+            if (c.MinSessionTimeMinutes.HasValue || c.MaxSessionTimeMinutes.HasValue)
+            {
+                var sessionMinutes = (int)Math.Max(0, (DateTime.UtcNow - sessionStart).TotalMinutes);
+                if (c.MinSessionTimeMinutes.HasValue && sessionMinutes < c.MinSessionTimeMinutes.Value) sessionOk = false;
+                if (c.MaxSessionTimeMinutes.HasValue && sessionMinutes > c.MaxSessionTimeMinutes.Value) sessionOk = false;
+            }
+
+            // Completion percentage range
+            if (c.CompletionPercentage != null)
+            {
+                var comp = ex != null ? ex.CompletionPercentage : 0;
+                var minC = Math.Max(0, c.CompletionPercentage.Min);
+                var maxC = Math.Min(100, c.CompletionPercentage.Max);
+                if (comp < minC || comp > maxC) completionOk = false;
+            }
+
+            // Multiplayer / Coop flags
+            if (c.HasMultiplayer.HasValue)
+            {
+                var hasMp = ex != null && ex.SupportsMultiplayer;
+                if (c.HasMultiplayer.Value != hasMp) mpOk = false;
+            }
+            if (c.HasCoop.HasValue)
+            {
+                var hasCoop = ex != null && ex.SupportsCoop;
+                if (c.HasCoop.Value != hasCoop) coopOk = false;
+            }
+            return platOk && genreOk && srcOk && hoursOk && daysOk &&
+playtimeOk && sessionOk && completionOk && mpOk && coopOk;
         }
 
         private static int Clamp(int v, int min, int max) => v < min ? min : (v > max ? max : v);
