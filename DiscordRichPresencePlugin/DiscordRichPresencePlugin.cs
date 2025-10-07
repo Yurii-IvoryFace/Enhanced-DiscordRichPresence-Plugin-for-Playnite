@@ -163,7 +163,7 @@ namespace DiscordRichPresencePlugin
                 {
                     progress.ProgressMaxValue = games.Count + 1;
 
-                    // ФАЗА 1: централізовано через сервіс
+                    // PHASE 1: Centrally via the service
                     progress.Text = "Creating mappings...";
                     try
                     {
@@ -178,7 +178,7 @@ namespace DiscordRichPresencePlugin
                         progress.CurrentProgressValue++;
                     }
 
-                    // ФАЗА 2: ассети
+                    // ФАЗА 2: assets
                     foreach (var game in games)
                     {
                         if (progress.CancelToken.IsCancellationRequested)
@@ -187,7 +187,7 @@ namespace DiscordRichPresencePlugin
                         progress.Text = $"Generating asset: {game.Name}";
                         try
                         {
-                            imageManager.PrepareGameImage(game); // EnsureMapping всередині
+                            imageManager.PrepareGameImage(game); // EnsureMapping inside
                             processed++;
                         }
                         catch (Exception ex)
@@ -217,7 +217,6 @@ namespace DiscordRichPresencePlugin
         {
             try
             {
-                // 1) Шлях до користувацьких даних плагіна
                 var pluginUserDataPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "Playnite",
@@ -225,13 +224,10 @@ namespace DiscordRichPresencePlugin
                     "7ad84e05-6c01-4b13-9b12-86af81775396"
                 );
 
-                // 2) Логер Playnite
                 var logger = LogManager.GetLogger();
 
-                // 3) Створюємо TemplateService з потрібними залежностями
                 var templateService = new TemplateService(pluginUserDataPath, logger);
 
-                // 4) Вікно менеджера шаблонів
                 var view = new TMNS.TemplateManagerView();
                 var vm = new TMNS.TemplateManagerViewModel(templateService);
                 view.DataContext = vm;

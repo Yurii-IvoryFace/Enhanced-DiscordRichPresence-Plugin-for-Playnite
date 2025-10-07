@@ -30,7 +30,11 @@
     </UserControl.Resources>
 
     <Grid Margin="10">
-        <TabControl>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="17*"/>
+            <ColumnDefinition Width="383*"/>
+        </Grid.ColumnDefinitions>
+        <TabControl Grid.ColumnSpan="2">
             <!-- GENERAL -->
             <TabItem Header="General">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">

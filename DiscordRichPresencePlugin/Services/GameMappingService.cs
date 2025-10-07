@@ -26,7 +26,6 @@ namespace DiscordRichPresencePlugin.Services
 
             EnsureMappingsStorage();
             LoadMappings();
-            EnsureMappingsFileExists();
         }
 
         private void LoadMappings()
@@ -45,7 +44,7 @@ namespace DiscordRichPresencePlugin.Services
                             mappings = new GameMappings { PlayniteLogo = Constants.DEFAULT_FALLBACK_IMAGE, Games = new List<GameMapping>() };
                         }
 
-                        // back-compat для старого ключа playnite_logo
+                        // back-compat for the old playnite_logo key
                         if (string.IsNullOrWhiteSpace(mappings.PlayniteLogo))
                         {
                             var compat = Serialization.FromJson<CompatV1>(json);
@@ -82,7 +81,7 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-        // DTO лише для читання snake_case поля
+        // DTO read-only snake_case fields
         private class CompatV1 { public string playnite_logo { get; set; } }
 
         public string GetMappingsFilePath() => mappingsFilePath;
@@ -100,7 +99,7 @@ namespace DiscordRichPresencePlugin.Services
                         throw new InvalidOperationException("Mappings file path has no directory.");
                     }
 
-                    // Idempotent: CreateDirectory не падає, якщо папка вже існує
+                    // Idempotent: CreateDirectory does not crash if the folder already exists
                     Directory.CreateDirectory(dataDir);
                     Directory.CreateDirectory(backupDirectory);
 
@@ -108,11 +107,11 @@ namespace DiscordRichPresencePlugin.Services
                     {
                         if (!createIfMissing)
                         {
-                            // повертай false, якщо файл відсутній і ми не маємо його створювати
+                            // return false if the file is missing and we don't need to create it
                             return false;
                         }
 
-                        // Створюємо порожній/дефолтний файл мапінгів
+                        // Creating an empty/default mapping file
                         SaveMappings();
                         logger?.Info($"Created mappings file at: {mappingsFilePath}");
                     }
@@ -152,8 +151,8 @@ namespace DiscordRichPresencePlugin.Services
         }
 
         /// <summary>
-        /// Гарантує наявність мапінгу для заданої гри; якщо відсутній — створить slug і збереже.
-        /// Повертає ключ зображення.
+        /// Guarantees the availability of mapping for a given game; if it is missing, it will create a slug and save it.
+        /// Returns the image key.
         /// </summary>
         public string EnsureMappingForName(string gameName)
         {
@@ -179,7 +178,7 @@ namespace DiscordRichPresencePlugin.Services
         }
 
         /// <summary>
-        /// Згенерувати відсутні мапінги для набору ігор. Повертає кількість доданих.
+        /// Generate missing mappings for a set of games. Returns the number added.
         /// </summary>
         public int GenerateMissingMappings(IEnumerable<Game> games)
         {
@@ -492,8 +491,7 @@ namespace DiscordRichPresencePlugin.Services
         // ---- helpers ----
 
         private static string SlugifyImageKey(string name, HashSet<string> existingKeys)
-        {
-            // нижній регістр, лише [a-z0-9_], обрізання до 64, унікалізація
+        {    
             var slug = System.Text.RegularExpressions.Regex
                 .Replace((name ?? "").ToLowerInvariant(), "[^a-z0-9]+", "_")
                 .Trim('_');

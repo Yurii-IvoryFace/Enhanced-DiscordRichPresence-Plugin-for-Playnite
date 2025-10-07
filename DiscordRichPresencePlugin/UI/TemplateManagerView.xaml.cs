@@ -17,7 +17,6 @@ namespace DiscordRichPresencePlugin.UI
             InitializeComponent();
         }
 
-        // Доступ до ViewModel з безпечним простором імен
         private global::DiscordRichPresencePlugin.UI.TemplateManagerViewModel VM
             => this.DataContext as global::DiscordRichPresencePlugin.UI.TemplateManagerViewModel;
 

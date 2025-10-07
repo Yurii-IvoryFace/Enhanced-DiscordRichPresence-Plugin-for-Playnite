@@ -226,19 +226,6 @@ namespace DiscordRichPresencePlugin.Services
                 .First();
         }
 
-
-
-        private static int GetSpecificityScore(TemplateConditions c)
-        {
-            if (c == null) return 0;
-            int score = 0;
-            if (c.Platforms != null && c.Platforms.Any()) score += 2;
-            if (c.Genres != null && c.Genres.Any()) score += 2;
-            if (c.DaysOfWeek != null && c.DaysOfWeek.Any()) score += 1;
-            if (c.TimeOfDay != null && (c.TimeOfDay.StartHour.HasValue || c.TimeOfDay.EndHour.HasValue)) score += 1;
-            return score;
-        }
-
         private static int GetSpecificityScore(TemplateConditions c)
         {
             if (c == null) return 0;

@@ -251,7 +251,7 @@ namespace DiscordRichPresencePlugin_UI
                 if (File.Exists(dest))
                 {
                     var stamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
-                    File.Copy(dest, Path.Combine(destDir, $"templates.{stamp}.json.bak"), false);
+                    File.Copy(dest, Path.Combine(destDir, $"status_templates.{stamp}.json.bak"), false);
                 }
 
                 File.Copy(ofd.FileName, dest, true);

@@ -182,7 +182,7 @@
             </Grid>
         </Border>
 
-        <!-- LEFT: Templates grid (у панелі з м’яким тінтом) -->
+        <!-- LEFT: Templates grid  -->
         <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,8,0">
             <TextBlock Text="Templates (top = priority 1)" Style="{StaticResource SectionHeader}"/>
             <Border Background="{StaticResource PanelTintBrush}"

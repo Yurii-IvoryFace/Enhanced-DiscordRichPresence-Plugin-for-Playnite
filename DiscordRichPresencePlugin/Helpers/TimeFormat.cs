@@ -2,7 +2,7 @@
 {
     public static class TimeFormat
     {
-        // Виводить "Xh Ym played" або "Ym played"
+        // Outputs "Xh Ym played" або "Ym played"
         public static string FormatPlaytimeSeconds(long totalSeconds)
         {
             var hours = totalSeconds / 3600;
