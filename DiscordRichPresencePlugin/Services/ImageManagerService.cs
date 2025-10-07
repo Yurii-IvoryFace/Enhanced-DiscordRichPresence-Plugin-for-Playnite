@@ -5,9 +5,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Text.RegularExpressions;
 using IOPath = System.IO.Path;
 
 namespace DiscordRichPresencePlugin.Services
@@ -210,6 +211,16 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
+
+        /// <summary>
+        /// Async wrapper to prepare image without blocking the caller thread.
+        /// </summary>
+        public Task<(string localPath, string assetKey)> PrepareGameImageAsync(Game game)
+        {
+            // Heavy IO/CPU (decode/encode images) → offload to thread pool
+            return Task.Run(() => PrepareGameImage(game));
+        }
+
         public void OpenAssetsFolder()
         {
             try
@@ -218,7 +229,12 @@ namespace DiscordRichPresencePlugin.Services
                 {
                     Directory.CreateDirectory(assetsDir);
                 }
-                System.Diagnostics.Process.Start("explorer.exe", assetsDir);
+                // Use default shell opener for cross-shell compatibility
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = assetsDir,
+                    UseShellExecute = true
+                });
             }
             catch (Exception ex)
             {
