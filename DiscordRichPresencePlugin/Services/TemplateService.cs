@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using DiscordRichPresencePlugin.Models;
 using DiscordRichPresencePlugin.Enums;
 using Playnite.SDK;
@@ -66,7 +67,7 @@ namespace DiscordRichPresencePlugin.Services
 
                 templates = list;
                 NormalizePriorities(templates);
-                SaveTemplates();
+                SaveTemplatesAsync();
             }
         }
 
@@ -128,6 +129,8 @@ namespace DiscordRichPresencePlugin.Services
                                 }
                                 else
                                 {
+                                    if (string.IsNullOrWhiteSpace(t.Id))
+                                        t.Id = Guid.NewGuid().ToString(); // ensure valid id
                                     templates.Add(t);
                                 }
                             }
@@ -135,7 +138,7 @@ namespace DiscordRichPresencePlugin.Services
                     }
 
                     NormalizePriorities(templates);
-                    SaveTemplates();
+                    SaveTemplatesAsync();
                 }
 
                 return true;
@@ -191,7 +194,7 @@ namespace DiscordRichPresencePlugin.Services
         public StatusTemplate SelectTemplate(Game game, ExtendedGameInfo extendedInfo, DateTime sessionStart)
         {
             if (game == null)
-                return null; 
+                return null;
 
             List<StatusTemplate> enabled;
             lock (lockObject)
@@ -266,7 +269,7 @@ namespace DiscordRichPresencePlugin.Services
             // Time of day (22-2)
             if (c.TimeOfDay != null && (c.TimeOfDay.StartHour.HasValue || c.TimeOfDay.EndHour.HasValue))
             {
-                var hour = DateTime.Now.Hour; 
+                var hour = DateTime.Now.Hour;
                 int a = Clamp(c.TimeOfDay.StartHour ?? 0, 0, 23);
                 int b = Clamp(c.TimeOfDay.EndHour ?? 23, 0, 23);
                 hoursOk = (a <= b) ? (hour >= a && hour <= b) : (hour >= a || hour <= b);
@@ -282,7 +285,7 @@ namespace DiscordRichPresencePlugin.Services
         }
 
         private static int Clamp(int v, int min, int max) => v < min ? min : (v > max ? max : v);
-    
+
 
         /// <summary>
         /// Formats template string with actual values
@@ -446,6 +449,31 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
+        private void SaveTemplatesAsync()
+        {
+            // Fire-and-forget async save to avoid blocking the caller
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    List<StatusTemplate> toWrite;
+                    lock (lockObject)
+                    {
+                        toWrite = templates.OrderBy(t => t.Priority).ToList();
+                    }
+                    var json = Serialization.ToJson(toWrite, true);
+                    var dir = Path.GetDirectoryName(templatesFilePath);
+                    if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                    await Helpers.IOAsyncUtils.WriteAllTextAsync(templatesFilePath, json).ConfigureAwait(false);
+                    logger?.Debug("Templates saved successfully (async)");
+                }
+                catch (Exception ex)
+                {
+                    logger?.Error($"Failed to save templates (async): {ex.Message}");
+                }
+            });
+        }
+
         private static void NormalizePriorities(List<StatusTemplate> list)
         {
             int p = 1;
@@ -453,6 +481,10 @@ namespace DiscordRichPresencePlugin.Services
             {
                 t.Priority = p++;
             }
+            // Normalize priorities to be 1..N based on current order.
+            var ordered = list.OrderBy(x => x.Priority).ToList();
+            for (int i = 0; i < ordered.Count; i++)
+                ordered[i].Priority = i + 1;
         }
     }
 }
