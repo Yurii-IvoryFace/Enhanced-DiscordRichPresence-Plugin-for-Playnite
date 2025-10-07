@@ -18,8 +18,14 @@ namespace DiscordRichPresencePlugin.Services
         private readonly string applicationId;
         private readonly ILogger logger;
         private NamedPipeClientStream pipe;
-        private bool isConnected = false;
+        private volatile bool isConnected = false;
         private int nonce = 0;
+        private readonly SemaphoreSlim _sendLock = new SemaphoreSlim(1, 1);
+        private Timer _heartbeatTimer;
+        private DateTime _lastPongUtc = DateTime.MinValue;
+        private volatile bool _disposed;
+        private readonly TimeSpan _heartbeatInterval = TimeSpan.FromSeconds(10);
+        private readonly TimeSpan _pongTimeout = TimeSpan.FromSeconds(15);
 
         public CustomDiscordRPC(string appId, ILogger logger)
         {
@@ -35,6 +41,7 @@ namespace DiscordRichPresencePlugin.Services
                 {
                     logger.Debug("Starting Discord RPC initialization");
                     await ConnectAsync();
+                    StartHeartbeat();
                 }
                 catch (Exception ex)
                 {
@@ -42,7 +49,7 @@ namespace DiscordRichPresencePlugin.Services
                 }
             });
         }
-            
+
         private async Task ConnectAsync()
         {
             logger.Debug("Attempting to connect to Discord...");
@@ -86,9 +93,89 @@ namespace DiscordRichPresencePlugin.Services
         }
         public void Reconnect()
         {
+            // Fire-and-forget safe reconnect
+            _ = ReconnectAsync();
+        }
+
+        private async Task ReconnectAsync()
+        {
+            if (_disposed) return;
             logger.Debug("Forcing Discord RPC reconnect");
-            try { Dispose(); } catch { /* ignore */ }
-            Initialize();
+            try
+            {
+                isConnected = false;
+                StopHeartbeat();
+                pipe?.Dispose();
+                pipe = null;
+            }
+            catch { /* ignore */ }
+
+            // Simple backoff (up to ~3s)
+            var delays = new[] { 200, 400, 800, 1600, 3000 };
+            foreach (var d in delays)
+            {
+                if (_disposed) return;
+                try
+                {
+                    await ConnectAsync();
+                    StartHeartbeat();
+                    // If a connection was re-established, exit
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    logger.Debug($"Reconnect attempt failed ({d}ms): {ex.Message}");
+                }
+                await Task.Delay(d);
+            }
+            logger.Warn("Reconnect attempts exhausted.");
+        }
+
+        private void StartHeartbeat()
+        {
+            try
+            {
+                _lastPongUtc = DateTime.UtcNow;
+                _heartbeatTimer?.Dispose();
+                // System.Threading.Timer runs on ThreadPool; safe for background ping
+                _heartbeatTimer = new Timer(async _ =>
+                {
+                    try
+                    {
+                        if (_disposed || !isConnected) return;
+                        await SendPingAsync();
+                        // Check if we missed pong for too long
+                        if (DateTime.UtcNow - _lastPongUtc > _pongTimeout)
+                        {
+                            logger.Warn("Discord RPC heartbeat timed out; reconnecting...");
+                            await ReconnectAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.Debug($"Heartbeat error: {ex.Message}");
+                        await ReconnectAsync();
+                    }
+                }, null, _heartbeatInterval, _heartbeatInterval);
+            }
+            catch (Exception ex)
+            {
+                logger.Debug($"Failed to start heartbeat: {ex.Message}");
+            }
+        }
+
+        private void StopHeartbeat()
+        {
+            try { _heartbeatTimer?.Dispose(); } catch { }
+            _heartbeatTimer = null;
+        }
+
+        private async Task SendPingAsync()
+        {
+            // Discord expects opcode Ping with any payload; we'll send empty object
+            await SendAsync(OpCode.Ping, new { });
+            // After sending ping, we'll attempt to read a single frame (non-blocking read is handled by ReadResponseAsync call during normal traffic)
+            // Note: We rely on UpdatePresence/handshake responses too; _lastPongUtc is updated in ReadResponseAsync when OpCode.Pong arrives.
         }
         private async Task HandshakeAsync()
         {
@@ -189,6 +276,7 @@ namespace DiscordRichPresencePlugin.Services
                 {
                     logger.Error($"ERROR setting presence: {ex}");
                     isConnected = false;
+                    await ReconnectAsync();
                 }
             });
         }
@@ -219,6 +307,7 @@ namespace DiscordRichPresencePlugin.Services
                 {
                     logger.Error($"ERROR clearing presence: {ex}");
                     isConnected = false;
+                    await ReconnectAsync();
                 }
             });
         }
@@ -267,11 +356,15 @@ namespace DiscordRichPresencePlugin.Services
                     await ReadExactAsync(pipe, payload, length).ConfigureAwait(false);
                 }
 
+                if (opCode == (int)OpCode.Pong) { _lastPongUtc = DateTime.UtcNow; }
+
                 return length > 0 ? Encoding.UTF8.GetString(payload) : string.Empty;
             }
             catch (Exception ex)
             {
                 logger.Error($"ERROR reading response: {ex}");
+                isConnected = false;
+                _ = ReconnectAsync();
                 return null;
             }
         }
@@ -295,12 +388,21 @@ namespace DiscordRichPresencePlugin.Services
                 BitConverter.GetBytes((int)opCode).CopyTo(header, 0);
                 BitConverter.GetBytes(data.Length).CopyTo(header, 4);
 
-                await pipe.WriteAsync(header, 0, header.Length).ConfigureAwait(false);
-                if (data?.Length > 0)
+                // Serialize writes to avoid interleaving frames
+                await _sendLock.WaitAsync().ConfigureAwait(false);
+                try
                 {
-                    await pipe.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                    await pipe.WriteAsync(header, 0, header.Length).ConfigureAwait(false);
+                    if (data?.Length > 0)
+                    {
+                        await pipe.WriteAsync(data, 0, data.Length).ConfigureAwait(false);
+                    }
+                    await pipe.FlushAsync().ConfigureAwait(false);
                 }
-                await pipe.FlushAsync().ConfigureAwait(false);
+                finally
+                {
+                    _sendLock.Release();
+                }
 
                 //logger.Debug("Data sent successfully");
             }
@@ -308,6 +410,7 @@ namespace DiscordRichPresencePlugin.Services
             {
                 logger.Error($"ERROR sending data to Discord: {ex}");
                 isConnected = false;
+                _ = ReconnectAsync();
             }
         }
 
@@ -317,7 +420,9 @@ namespace DiscordRichPresencePlugin.Services
         {
             try
             {
+                _disposed = true;
                 isConnected = false;
+                StopHeartbeat();
                 pipe?.Dispose();
                 pipe = null;
                 logger.Debug("Discord RPC disposed");
