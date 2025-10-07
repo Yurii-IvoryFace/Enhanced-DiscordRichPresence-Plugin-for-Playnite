@@ -1,4 +1,6 @@
 ﻿using DiscordRichPresencePlugin.Models;
+using DiscordRichPresencePlugin.Helpers;
+
 using Playnite.SDK;
 using Playnite.SDK.Data;
 using Playnite.SDK.Models;
@@ -328,14 +330,12 @@ namespace DiscordRichPresencePlugin.Services
         {
             try
             {
-                await Task.Run(() =>
+                string json;
+                lock (lockObject)
                 {
-                    lock (lockObject)
-                    {
-                        var json = Serialization.ToJson(mappings, true);
-                        File.WriteAllText(exportPath, json);
-                    }
-                });
+                    json = Serialization.ToJson(mappings, true);
+                }
+                await IOAsyncUtils.WriteAllTextAsync(exportPath, json).ConfigureAwait(false);
 
                 logger?.Info($"Exported mappings to: {exportPath}");
                 return true;
@@ -357,11 +357,8 @@ namespace DiscordRichPresencePlugin.Services
                     return false;
                 }
 
-                var importedMappings = await Task.Run(() =>
-                {
-                    var json = File.ReadAllText(importPath);
-                    return Serialization.FromJson<GameMappings>(json);
-                });
+                var json = await IOAsyncUtils.ReadAllTextAsync(importPath).ConfigureAwait(false);
+                var importedMappings = Serialization.FromJson<GameMappings>(json);
 
                 if (importedMappings?.Games == null)
                 {
@@ -481,6 +478,7 @@ namespace DiscordRichPresencePlugin.Services
                 }
 
                 logger?.Debug("Game mappings saved successfully");
+                _ = SaveMappingsAsync();
             }
             catch (Exception ex)
             {
@@ -488,10 +486,33 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
+
+        /// <summary>
+        /// Asynchronously persists mappings to disk. Safe for net472.
+        /// </summary>
+        private async Task SaveMappingsAsync()
+        {
+            try
+            {
+                string json;
+                lock (lockObject)
+                {
+                    json = Serialization.ToJson(mappings, true);
+                }
+                await IOAsyncUtils.WriteAllTextAsync(mappingsFilePath, json).ConfigureAwait(false);
+                logger?.Debug("Game mappings saved successfully (async)");
+            }
+            catch (Exception ex)
+            {
+                logger?.Error($"Failed to save mappings (async): {ex.Message}");
+            }
+        }
+
+
         // ---- helpers ----
 
         private static string SlugifyImageKey(string name, HashSet<string> existingKeys)
-        {    
+        {
             var slug = System.Text.RegularExpressions.Regex
                 .Replace((name ?? "").ToLowerInvariant(), "[^a-z0-9]+", "_")
                 .Trim('_');
