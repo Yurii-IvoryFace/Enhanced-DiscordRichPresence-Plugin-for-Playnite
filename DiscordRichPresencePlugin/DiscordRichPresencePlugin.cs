@@ -96,7 +96,8 @@ namespace DiscordRichPresencePlugin
             {
                 discordService.UpdateGamePresence(args.Game);
                 extendedInfoService?.StartSession(args.Game.Id);
-                var _ = imageManager.PrepareGameImage(args.Game); // Ensure mapping + asset
+                // Run image preparation in background to avoid blocking play start event.
+                var _ = imageManager.PrepareGameImageAsync(args.Game); // Ensure mapping + asset
             }
         }
 
