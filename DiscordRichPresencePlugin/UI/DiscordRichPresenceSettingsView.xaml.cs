@@ -34,11 +34,11 @@ namespace DiscordRichPresencePlugin_UI
             InitializeComponent();
             playniteApi = API.Instance;
             this.imageManager = imageManager;
-            this.openTemplateManagerAction = openTemplateManagerAction; // ← зберігаємо делегат
+            this.openTemplateManagerAction = openTemplateManagerAction; // keep the delegate
             DataContext = settings;
         }
 
-        // обгортки НЕ створюються в рантаймі, але хай будуть для дизайнера
+        // Wrappers are not created in real time, but let them be for the designer.
         public DiscordRichPresenceSettingsView(PluginNS.DiscordRichPresenceSettings settings, ImageManagerService imageManager)
             : this(settings, imageManager, null) { }
 
@@ -108,14 +108,14 @@ namespace DiscordRichPresencePlugin_UI
         private void DigitsOnly_PreviewTextInput(object sender, TextCompositionEventArgs e) => AppIdTextBox_PreviewTextInput(sender, e);
         private void DigitsOnly_Pasting(object sender, DataObjectPastingEventArgs e) => AppIdTextBox_Pasting(sender, e);
 
-        // -------- папки / посилання --------
+        // -------- folders / links --------
 
         private string GetPluginUserDataPath()
         {
             return Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "Playnite", "ExtensionsData",
-                "7ad84e05-6c01-4b13-9b12-86af81775396" // якщо інший PluginId — заміни на свій
+                "7ad84e05-6c01-4b13-9b12-86af81775396"
             );
         }
 

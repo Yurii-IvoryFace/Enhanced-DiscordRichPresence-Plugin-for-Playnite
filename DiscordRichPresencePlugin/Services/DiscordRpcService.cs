@@ -57,7 +57,7 @@ namespace DiscordRichPresencePlugin.Services
         }
 
         /// <summary>
-        /// Повна переініціалізація з новим App ID (викликати після зміни налаштувань).
+        /// Complete reinitialization with a new App ID (call after changing settings).
         /// </summary>
         public void Reinitialize(string newAppId)
         {
@@ -70,19 +70,19 @@ namespace DiscordRichPresencePlugin.Services
 
             logger.Info($"Reinitializing Discord RPC: {appId} -> {target}");
 
-            // зупинити таймер, прибрати старий RPC
+            // stop the timer, remove the old RPC
             try { presenceUpdateTimer?.Stop(); } catch { }
             presenceUpdateTimer?.Dispose();
             presenceUpdateTimer = null;
 
             try { discordRPC?.Dispose(); } catch { }
 
-            // створити новий RPC і ініціалізувати
+            // create a new RPC and initialize it
             appId = target;
             discordRPC = new CustomDiscordRPC(appId, logger);
             discordRPC.Initialize();
 
-            // якщо гра активна — відновити presence і таймер
+            // if the game is active — restore presence and timer
             if (currentGame != null)
             {
                 UpdatePresence();
@@ -116,7 +116,12 @@ namespace DiscordRichPresencePlugin.Services
 
             var interval = Math.Max(Constants.MIN_UPDATE_INTERVAL, Math.Min(Constants.MAX_UPDATE_INTERVAL, settings.UpdateInterval));
             presenceUpdateTimer = new Timer(interval * 1000);
-            presenceUpdateTimer.Elapsed += (_, __) => UpdatePresence();
+            presenceUpdateTimer.Elapsed += (_, __) =>
+            {
+                try { UpdatePresence(); }
+                catch (Exception ex) { logger.Error($"UpdatePresence timer error: {ex}"); }
+            }
+            ;
             presenceUpdateTimer.AutoReset = true;
             presenceUpdateTimer.Start();
 
@@ -132,16 +137,23 @@ namespace DiscordRichPresencePlugin.Services
 
             try
             {
+                // Select template once per update to avoid duplicate work
+                StatusTemplate selectedTemplate = null;
+                if (settings.UseTemplates && templateService != null)
+                {
+                    selectedTemplate = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
+                }
+
                 var startTimestamp = settings.ShowElapsedTime
-                    ? ((DateTimeOffset)gameStartTime).ToUnixTimeSeconds()
-                    : 0;
+    ? ((DateTimeOffset)gameStartTime).ToUnixTimeSeconds()
+    : 0;
 
                 var buttons = BuildButtons();
 
                 var presence = new DiscordPresence
                 {
-                    Details = FormatGameDetails(),
-                    State = FormatGameState(),
+                    Details = FormatGameDetails(selectedTemplate),
+                    State = FormatGameState(selectedTemplate),
                     StartTimestamp = startTimestamp,
                     LargeImageKey = GetGameImageKey(),
                     LargeImageText = currentGame.Name,
@@ -158,31 +170,19 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
-        private string FormatGameDetails()
+        private string FormatGameDetails(StatusTemplate selectedTemplate)
         {
             if (currentGame == null) return string.Empty;
 
-            if (settings.UseTemplates && templateService != null)
+            if (settings.UseTemplates && templateService != null && selectedTemplate != null)
             {
-                var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
-                if (t != null)
+                var formatted = templateService.FormatTemplateString(selectedTemplate.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
+                if (!string.IsNullOrWhiteSpace(formatted))
                 {
-                    var formatted = templateService.FormatTemplateString(
-                        t.DetailsFormat, currentGame, currentExtendedInfo, gameStartTime);
-                    if (!string.IsNullOrWhiteSpace(formatted))
-                    {
-                        logger.Debug($"[DRP][Templates] Using template for Details: '{t.Name}' (Priority={t.Priority})");
-                        return formatted;
-                    }
-                    else
-                    {
-                        logger.Debug($"[DRP][Templates] Template '{t?.Name}' produced empty Details, will fallback.");
-                    }
+                    logger.Debug($"[DRP][Templates] Using template for Details: '{selectedTemplate.Name}' (Priority={selectedTemplate.Priority})");
+                    return formatted;
                 }
-                else
-                {
-                    logger.Debug("[DRP][Templates] No matching template for Details (UseTemplates=ON).");
-                }
+                logger.Debug($"[DRP][Templates] Template '{selectedTemplate.Name}' produced empty Details, will fallback.");
             }
 
             // Fallback: CustomStatus / default
@@ -198,31 +198,20 @@ namespace DiscordRichPresencePlugin.Services
             return fb;
         }
 
-        private string FormatGameState()
+        private string FormatGameState(StatusTemplate selectedTemplate)
         {
+
             if (currentGame == null) return string.Empty;
 
-            if (settings.UseTemplates && templateService != null)
+            if (settings.UseTemplates && templateService != null && selectedTemplate != null)
             {
-                var t = templateService.SelectTemplate(currentGame, currentExtendedInfo, gameStartTime);
-                if (t != null)
+                var formatted = templateService.FormatTemplateString(selectedTemplate.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
+                if (!string.IsNullOrWhiteSpace(formatted))
                 {
-                    var formatted = templateService.FormatTemplateString(
-                        t.StateFormat, currentGame, currentExtendedInfo, gameStartTime);
-                    if (!string.IsNullOrWhiteSpace(formatted))
-                    {
-                        logger.Debug($"[DRP][Templates] Using template for State: '{t.Name}' (Priority={t.Priority})");
-                        return formatted;
-                    }
-                    else
-                    {
-                        logger.Debug($"[DRP][Templates] Template '{t?.Name}' produced empty State, will fallback.");
-                    }
+                    logger.Debug($"[DRP][Templates] Using template for State: '{selectedTemplate.Name}' (Priority={selectedTemplate.Priority})");
+                    return formatted;
                 }
-                else
-                {
-                    logger.Debug("[DRP][Templates] No matching template for State (UseTemplates=ON).");
-                }
+                logger.Debug($"[DRP][Templates] Template '{selectedTemplate.Name}' produced empty State, will fallback.");
             }
 
             // Legacy/manual construction with optional extras
@@ -323,7 +312,7 @@ namespace DiscordRichPresencePlugin.Services
         {
             if (string.IsNullOrWhiteSpace(url)) return false;
             if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return false;
-            // Discord зазвичай приймає тільки HTTPS для кнопок
+            // Discord usually only accepts HTTPS for buttons.
             return string.Equals(u.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
         }
 

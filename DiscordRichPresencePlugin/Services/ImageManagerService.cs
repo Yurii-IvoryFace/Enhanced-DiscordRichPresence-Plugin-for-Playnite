@@ -5,19 +5,20 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Text.RegularExpressions;
 using IOPath = System.IO.Path;
 
 namespace DiscordRichPresencePlugin.Services
 {
     /// <summary>
-    /// Підготовка локальних зображень для Discord assets:
-    /// - масштаб до діапазону [512..1024] по обох осях,
-    /// - якщо після масштабування одна зі сторін < 512 → додаємо прозору підкладку,
-    /// - PNG як перша спроба, потім JPEG зі зниженням якості до <256KB,
-    /// - кеш за хешем джерела.
+    /// Preparing local images for Discord assets:
+    /// - scale to range [512..1024] on both axes,
+    /// - if after scaling one of the sides is < 512 → add a transparent background,
+    /// - PNG as the first attempt, then JPEG with quality reduced to <256KB,
+    /// - cache by source hash.
     /// </summary>
     public class ImageManagerService
     {
@@ -210,6 +211,16 @@ namespace DiscordRichPresencePlugin.Services
             }
         }
 
+
+        /// <summary>
+        /// Async wrapper to prepare image without blocking the caller thread.
+        /// </summary>
+        public Task<(string localPath, string assetKey)> PrepareGameImageAsync(Game game)
+        {
+            // Heavy IO/CPU (decode/encode images) → offload to thread pool
+            return Task.Run(() => PrepareGameImage(game));
+        }
+
         public void OpenAssetsFolder()
         {
             try
@@ -218,7 +229,12 @@ namespace DiscordRichPresencePlugin.Services
                 {
                     Directory.CreateDirectory(assetsDir);
                 }
-                System.Diagnostics.Process.Start("explorer.exe", assetsDir);
+                // Use default shell opener for cross-shell compatibility
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = assetsDir,
+                    UseShellExecute = true
+                });
             }
             catch (Exception ex)
             {
@@ -231,11 +247,11 @@ namespace DiscordRichPresencePlugin.Services
             var removed = 0;
             try
             {
-                // Ключі з маніфесту = валідні assetKey
+                // Keys from the manifest = valid assetKey
                 var keys = new HashSet<string>(manifest.Keys, StringComparer.OrdinalIgnoreCase);
 
-                // Резервні ключі, які не видаляємо навіть якщо не в маніфесті
-                keys.Add(Constants.DEFAULT_FALLBACK_IMAGE); // напр., "playnite_logo"
+                // Reserve keys that we do not delete even if they are not in the manifest
+                keys.Add(Constants.DEFAULT_FALLBACK_IMAGE); // exmpl., "playnite_logo"
 
                 foreach (var file in Directory.EnumerateFiles(assetsDir, "*.*", SearchOption.TopDirectoryOnly))
                 {
@@ -301,7 +317,7 @@ namespace DiscordRichPresencePlugin.Services
             {
                 var bi = new BitmapImage();
                 bi.BeginInit();
-                bi.CacheOption = BitmapCacheOption.OnLoad; // не тримаємо файл відкритим
+                bi.CacheOption = BitmapCacheOption.OnLoad;
                 bi.StreamSource = fs;
                 bi.EndInit();
                 bi.Freeze();
@@ -310,9 +326,9 @@ namespace DiscordRichPresencePlugin.Services
         }
 
         /// <summary>
-        /// Масштабує зображення так, щоб виконувались обмеження:
+        /// Scales the image so that the following constraints are met:
         /// - max(dim) ≤ MaxPx,
-        /// - min(dim) ≥ MinPx (якщо не виконується після масштабування — додає прозору підкладку).
+        /// - min(dim) ≥ MinPx (if not met after scaling, adds a transparent background).
         /// </summary>
         private static BitmapSource ResizeAndPadToRange(BitmapSource src, int minPx, int maxPx)
         {
@@ -321,7 +337,7 @@ namespace DiscordRichPresencePlugin.Services
 
             if (sw <= 0 || sh <= 0)
                 return src;
-            // Обчислюємо допустимий масштаб s:
+            // Calculate the permissible scale s:
             // 512 ≤ min(sw*s, sh*s),  max(sw*s, sh*s) ≤ 1024
             // sLower = 512 / min(sw,sh), sUpper = 1024 / max(sw,sh)
             double sLower = (double)minPx / Math.Min(sw, sh);
@@ -330,29 +346,29 @@ namespace DiscordRichPresencePlugin.Services
             double s = (sLower <= sUpper) ? sLower : sUpper; // якщо неможливо виконати обидва — не перевищуємо max
             if (double.IsNaN(s) || double.IsInfinity(s) || s <= 0) s = 1.0;
 
-            // Масштабуємо
+            // Scaling
             var scaled = new TransformedBitmap(src, new ScaleTransform(s, s));
             scaled.Freeze();
 
             int tw = (int)Math.Round(sw * s);
             int th = (int)Math.Round(sh * s);
 
-            // Якщо якась зі сторін все ще < minPx — додаємо прозору підкладку до minPx
+            // If any of the sides are still < minPx — add a transparent background to minPx
             int canvasW = Math.Max(tw, minPx);
             int canvasH = Math.Max(th, minPx);
 
-            // Якщо обидві сторони вже в діапазоні — підкладка не потрібна
+            // If both sides are already within range, no backing is needed.
             if (canvasW == tw && canvasH == th)
             {
                 return scaled;
             }
 
-            // Малюємо scaled по центру прозорого полотна
+            // Draw scaled in the center of a transparent canvas
             var dv = new System.Windows.Media.DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
-                // Прозорий фон (нічого не малюємо — за замовчуванням прозорий)
-                // Центруємо
+                // Transparent background (we don't draw anything — transparent by default)
+                // Center
                 double ox = (canvasW - tw) / 2.0;
                 double oy = (canvasH - th) / 2.0;
                 dc.DrawImage(scaled, new System.Windows.Rect(ox, oy, tw, th));
