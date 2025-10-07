@@ -1,0 +1,18 @@
+AddonId: 7ad84e05-6c01-4b13-9b12-86af81775396
+Type: Generic
+InstallerManifestUrl: https://github.com/Yurii-IvoryFace/Enhanced-DiscordRichPresence-Plugin-for-Playnite/releases/download/v1.1.1/DiscordRichPresenceEnhanced_1_1_1.pext
+ShortDescription: Enhanced Discord Rich Presence integration for Playnite with custom game icons, description, and more.
+Name: Enhanced Discord Rich Presence
+Author: Yurii-IvoryFace
+Tags: ['utilities', 'tools', 'discord']
+SourceUrl: https://github.com/Yurii-IvoryFace/Enhanced-DiscordRichPresence-Plugin-for-Playnite
+Links: 
+    GitHub: https://github.com/Yurii-IvoryFace
+    Discord DevPortal: https://discord.com/developers/applications
+Description: |
+    You need to have DIscord Application ID to use this plugin. 
+    You can create your own Discord Application at Discord Developer Portal. 
+    After creating the application, copy the Client ID and paste it into the plugin settings in Playnite.
+
+    Click at the GitHub link for more information and setup instructions.
+IconUrl: later
