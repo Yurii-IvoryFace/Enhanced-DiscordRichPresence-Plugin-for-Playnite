@@ -2,7 +2,6 @@
 
 Bring your Playnite sessions to life, Choose exactly what shows up on Discord (game, platform, session time, progress, etc.), organize presets with priorities and conditions.
 
-###### ⚠️ Not affiliated with Playnite or Discord.
 ------------
 
 ## Features
@@ -100,3 +99,5 @@ All presets are stored here:
 
 #### License
 MIT
+
+###### Not affiliated with Discord.
